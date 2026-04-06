@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { UserPlus, Copy, Users, UserX, Trash2, UserCheck } from 'lucide-react';
+import { UserPlus, Copy, Users, UserX, Trash2, UserCheck, KeyRound } from 'lucide-react';
 import type { User } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
@@ -11,7 +11,8 @@ type PendingAction =
   | { type: 'deactivate' | 'activate' | 'delete'; worker: User };
 
 export default function Workers() {
-  const { user, workers, createWorkerAccount, setWorkerStatus, deleteWorkerAccount } = useAuth();
+  const { user, workers, createWorkerAccount, setWorkerStatus, deleteWorkerAccount, updateWorkerCredentialsByDirector } =
+    useAuth();
   const { appendAudit } = useWarehouse();
   const { t } = useI18n();
   const [fullName, setFullName] = useState('');
@@ -20,11 +21,63 @@ export default function Workers() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
+  const [editWorker, setEditWorker] = useState<User | null>(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const sortedWorkers = [...workers].sort((a, b) => {
     if (a.status === b.status) return a.fullName.localeCompare(b.fullName, 'ru');
     return a.status === 'active' ? -1 : 1;
   });
+
+  const openEdit = (w: User) => {
+    setEditWorker(w);
+    setEditUsername(w.username);
+    setEditPassword('');
+  };
+
+  const closeEdit = () => {
+    setEditWorker(null);
+    setEditUsername('');
+    setEditPassword('');
+  };
+
+  const handleEditSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editWorker || !user) return;
+    const u = editUsername.trim().toLowerCase();
+    const pwd = editPassword;
+    const usernameChanged = u !== editWorker.username.toLowerCase();
+    const passwordSet = pwd.length > 0;
+    if (!usernameChanged && !passwordSet) {
+      toast.info(t('workers.noChanges'));
+      return;
+    }
+    setEditSaving(true);
+    const result = updateWorkerCredentialsByDirector(user, editWorker.id, {
+      username: usernameChanged ? u : undefined,
+      password: passwordSet ? pwd : undefined,
+    });
+    setEditSaving(false);
+    if (!result.ok) {
+      toast.error(result.error ?? t('workers.toastCredsFail'));
+      return;
+    }
+    const parts: string[] = [];
+    if (usernameChanged) parts.push(`логин → @${u}`);
+    if (passwordSet) parts.push('пароль обновлён');
+    appendAudit({
+      userName: user.fullName,
+      userRole: 'director',
+      action: 'Изменение',
+      entity: 'Пользователь',
+      details: `Рабочий ${editWorker.fullName}: ${parts.join(', ')}`,
+      ip: '—',
+    });
+    toast.success(t('workers.toastCredsOk'));
+    closeEdit();
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +190,58 @@ export default function Workers() {
           {t("workers.pageSubtitle")}
         </p>
       </div>
+
+      {editWorker && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40">
+          <form
+            onSubmit={handleEditSave}
+            className="bg-white rounded-xl border border-slate-200 shadow-lg max-w-md w-full p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">{t('workers.editAccessTitle')}</h2>
+            <p className="text-sm text-slate-600 mb-4">{editWorker.fullName}</p>
+            <p className="text-xs text-slate-500 mb-4">{t('workers.editAccessHint')}</p>
+            <div className="space-y-3 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
+                <input
+                  type="text"
+                  required
+                  pattern="[a-zA-Z0-9_.\\-]{2,32}"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.optionalNewPassword')}</label>
+                <input
+                  type="text"
+                  minLength={4}
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                  placeholder="••••"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="px-4 py-2.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={editSaving}
+                className="px-4 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {pending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -265,6 +370,14 @@ export default function Workers() {
                     >
                       {w.status === 'active' ? t('workers.active') : t('workers.inactive')}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(w)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 text-slate-800 bg-slate-50 rounded-lg hover:bg-slate-100"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      {t('workers.editAccess')}
+                    </button>
                     {w.status === 'active' ? (
                       <button
                         type="button"

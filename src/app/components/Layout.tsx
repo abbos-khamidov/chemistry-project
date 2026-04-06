@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import {
   Package,
@@ -7,7 +7,6 @@ import {
   Menu,
   X,
   ChevronDown,
-  LogOut,
   FileSearch,
   Target,
   Wallet,
@@ -18,11 +17,11 @@ import { useI18n } from '../i18n/I18nContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { BrandLogo } from './BrandLogo';
 import { NotificationsPopover } from './NotificationsPopover';
+import { ProfileDialog } from './ProfileDialog';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
@@ -45,13 +44,6 @@ export default function Layout() {
     ];
   }, [currentUser.role]);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleLogout = () => {
     logout();
@@ -127,8 +119,12 @@ export default function Layout() {
           </nav>
 
           <div className="p-4 border-t border-slate-200/80">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setProfileDialogOpen(true)}
+              className="w-full flex items-center gap-3 text-left rounded-lg hover:bg-slate-50 p-2 -m-2 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
                 <span className="text-slate-700 font-semibold text-sm">
                   {currentUser.fullName.split(' ').map((n) => n[0]).join('')}
                 </span>
@@ -137,7 +133,7 @@ export default function Layout() {
                 <p className="text-sm font-medium truncate text-slate-800">{currentUser.fullName}</p>
                 <p className="text-xs text-slate-500">{currentUser.role === 'director' ? t('layout.roleDirector') : t('layout.roleWorker')}</p>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </aside>
@@ -168,11 +164,13 @@ export default function Layout() {
 
               <NotificationsPopover />
 
-              <div className="relative" ref={profileRef}>
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setProfileOpen((o) => !o)}
+                  onClick={() => setProfileDialogOpen(true)}
                   className="flex items-center gap-2 p-2 hover:bg-slate-100 rounded-lg"
+                  aria-haspopup="dialog"
+                  aria-expanded={profileDialogOpen}
                 >
                   <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
                     <span className="text-slate-700 font-semibold text-xs">
@@ -181,22 +179,6 @@ export default function Layout() {
                   </div>
                   <ChevronDown className="w-4 h-4 text-slate-600 hidden sm:block" />
                 </button>
-                {profileOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50">
-                    <div className="px-3 py-2 border-b border-slate-100">
-                      <p className="text-sm font-medium text-slate-800 truncate">{currentUser.fullName}</p>
-                      <p className="text-xs text-slate-500 truncate">{currentUser.username}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      {t('layout.logout')}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -211,6 +193,12 @@ export default function Layout() {
             <p className="text-center text-sm text-slate-500">{t('layout.footer')}</p>
           </div>
         </footer>
+
+        <ProfileDialog
+          open={profileDialogOpen}
+          onOpenChange={setProfileDialogOpen}
+          onLogout={handleLogout}
+        />
       </div>
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/80 z-30">

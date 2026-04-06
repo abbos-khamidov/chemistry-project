@@ -162,6 +162,20 @@ function readInitialSessionUserId(): string | null {
   return id;
 }
 
+export type UpdateDirectorProfileInput = {
+  fullName?: string;
+  phone?: string;
+  newUsername?: string;
+  newPassword?: string;
+  passwordConfirm?: string;
+  currentPassword?: string;
+};
+
+export type UpdateWorkerCredentialsInput = {
+  username?: string;
+  password?: string;
+};
+
 type AuthContextValue = {
   user: User | null;
   workers: User[];
@@ -170,6 +184,12 @@ type AuthContextValue = {
   createWorkerAccount: (director: User | null, input: CreateWorkerInput) => AuthResult;
   setWorkerStatus: (director: User | null, workerId: string, status: 'active' | 'inactive') => AuthResult;
   deleteWorkerAccount: (director: User | null, workerId: string) => AuthResult;
+  updateDirectorProfile: (director: User | null, input: UpdateDirectorProfileInput) => AuthResult;
+  updateWorkerCredentialsByDirector: (
+    director: User | null,
+    workerId: string,
+    input: UpdateWorkerCredentialsInput,
+  ) => AuthResult;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -305,6 +325,118 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistSession(null);
   }, [persistSession]);
 
+  const updateDirectorProfile = useCallback(
+    (director: User | null, input: UpdateDirectorProfileInput): AuthResult => {
+      if (!director || director.role !== 'director') {
+        return { ok: false, error: 'Профиль директора доступен только директору' };
+      }
+      const list = loadAccounts();
+      const idx = list.findIndex((a) => a.id === director.id);
+      if (idx === -1 || list[idx].role !== 'director') {
+        return { ok: false, error: 'Учётная запись не найдена' };
+      }
+      const acc = list[idx];
+      const nextU = input.newUsername != null ? input.newUsername.trim().toLowerCase() : undefined;
+      const wantUser = nextU !== undefined && nextU !== '';
+      const usernameChanged = wantUser && nextU !== acc.username.toLowerCase();
+      const pwd = input.newPassword;
+      const wantPwd = pwd != null && pwd !== '';
+      const passwordChanged = wantPwd;
+
+      if (usernameChanged || passwordChanged) {
+        const cur = input.currentPassword ?? '';
+        if (!cur) {
+          return { ok: false, error: 'Введите текущий пароль для смены логина или пароля' };
+        }
+        if (cur !== acc.password) {
+          return { ok: false, error: 'Неверный текущий пароль' };
+        }
+        if (usernameChanged) {
+          if (!USERNAME_RE.test(nextU!)) {
+            return {
+              ok: false,
+              error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+            };
+          }
+          if (list.some((a, i) => i !== idx && a.username.toLowerCase() === nextU)) {
+            return { ok: false, error: 'Такой логин уже занят' };
+          }
+        }
+        if (passwordChanged) {
+          if ((pwd as string).length < 4) {
+            return { ok: false, error: 'Пароль не короче 4 символов' };
+          }
+          if ((pwd as string) !== (input.passwordConfirm ?? '')) {
+            return { ok: false, error: 'Новый пароль и подтверждение не совпадают' };
+          }
+        }
+      }
+
+      const nextAcc: StoredAccount = { ...acc };
+      if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
+      if (input.phone !== undefined) nextAcc.phone = input.phone.trim();
+      if (usernameChanged && nextU) nextAcc.username = nextU;
+      if (passwordChanged && pwd) nextAcc.password = pwd;
+
+      const next = [...list];
+      next[idx] = nextAcc;
+      saveAccounts(next);
+      setAccounts(next);
+      setUser(stripPassword(nextAcc));
+      return { ok: true, role: 'director' };
+    },
+    []
+  );
+
+  const updateWorkerCredentialsByDirector = useCallback(
+    (director: User | null, workerId: string, input: UpdateWorkerCredentialsInput): AuthResult => {
+      if (!director || director.role !== 'director') {
+        return { ok: false, error: 'Менять логин и пароль может только директор' };
+      }
+      const uname = input.username?.trim().toLowerCase();
+      const pwd = input.password;
+      const hasU = uname !== undefined && uname !== '';
+      const hasP = pwd !== undefined && pwd !== '';
+      if (!hasU && !hasP) {
+        return { ok: false, error: 'Укажите новый логин или пароль' };
+      }
+      const list = loadAccounts();
+      const idx = list.findIndex((a) => a.id === workerId);
+      if (idx === -1 || list[idx].role !== 'worker') {
+        return { ok: false, error: 'Рабочий не найден' };
+      }
+      const acc = list[idx];
+      const nextAcc: StoredAccount = { ...acc };
+      if (hasU) {
+        if (!USERNAME_RE.test(uname!)) {
+          return {
+            ok: false,
+            error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+          };
+        }
+        if (list.some((a, i) => i !== idx && a.username.toLowerCase() === uname)) {
+          return { ok: false, error: 'Такой логин уже занят' };
+        }
+        nextAcc.username = uname!;
+      }
+      if (hasP) {
+        if ((pwd as string).length < 4) {
+          return { ok: false, error: 'Пароль не короче 4 символов' };
+        }
+        nextAcc.password = pwd as string;
+      }
+      const next = [...list];
+      next[idx] = nextAcc;
+      saveAccounts(next);
+      setAccounts(next);
+      if (user?.id === workerId) {
+        setUser(stripPassword(nextAcc));
+      }
+      return { ok: true, role: 'worker' };
+    },
+    [user?.id]
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -314,8 +446,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createWorkerAccount,
       setWorkerStatus,
       deleteWorkerAccount,
+      updateDirectorProfile,
+      updateWorkerCredentialsByDirector,
     }),
-    [user, workers, login, logout, createWorkerAccount, setWorkerStatus, deleteWorkerAccount]
+    [
+      user,
+      workers,
+      login,
+      logout,
+      createWorkerAccount,
+      setWorkerStatus,
+      deleteWorkerAccount,
+      updateDirectorProfile,
+      updateWorkerCredentialsByDirector,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

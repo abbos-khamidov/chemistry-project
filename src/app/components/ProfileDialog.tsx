@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { LogOut, Users } from 'lucide-react';
+import { ArrowRight, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import {
@@ -80,6 +80,18 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
 
         {isDirector ? (
           <form onSubmit={handleSaveDirector} className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-sm font-medium text-slate-900">{t('profile.manageAllUsers')}</p>
+              <p className="text-xs text-slate-600 mt-1">{t('profile.manageAllUsersDesc')}</p>
+              <Link
+                to="/workers"
+                onClick={() => onOpenChange(false)}
+                className="mt-3 inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900"
+              >
+                {t('profile.goToWorkers')}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.fullName')}</label>
               <input

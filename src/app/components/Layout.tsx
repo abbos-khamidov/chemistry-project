@@ -167,11 +167,10 @@ export default function Layout() {
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => {
-                    setProfileOpen(false);
-                    setProfileDialogOpen(true);
-                  }}
+                  onClick={() => setProfileDialogOpen(true)}
                   className="flex items-center gap-2 p-2 hover:bg-slate-100 rounded-lg"
+                  aria-haspopup="dialog"
+                  aria-expanded={profileDialogOpen}
                 >
                   <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
                     <span className="text-slate-700 font-semibold text-xs">

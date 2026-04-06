@@ -33,6 +33,9 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       badgeDirector: 'директор',
       noWorkersYet: 'Пока нет рабочих — создайте учётную запись на странице «Рабочие».',
       openWorkers: 'Открыть страницу «Рабочие»',
+      manageAllUsers: 'Управление всеми пользователями',
+      manageAllUsersDesc: 'Создание учётных записей, смена логина и пароля у рабочих — в разделе «Рабочие».',
+      goToWorkers: 'Перейти к рабочим',
       workerCredentialsNote:
         'Изменить логин и пароль может только директор. Обратитесь к руководителю.',
       toastSaveOk: 'Профиль сохранён',
@@ -366,6 +369,9 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       badgeDirector: 'direktor',
       noWorkersYet: "Hozircha ishchi yo'q — «Ishchilar» sahifasida yarating.",
       openWorkers: '«Ishchilar» sahifasini ochish',
+      manageAllUsers: 'Barcha foydalanuvchilar',
+      manageAllUsersDesc: 'Akkauntlar, login va parolni ishchilar uchun «Ishchilar» bo‘limida boshqaring.',
+      goToWorkers: 'Ishchilarga o‘tish',
       workerCredentialsNote:
         "Login va parolni faqat direktor o'zgartiradi. Direktorga murojaat qiling.",
       toastSaveOk: 'Saqlandi',

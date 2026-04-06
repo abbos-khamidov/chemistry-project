@@ -1,20 +1,49 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, Phone, Calendar, DollarSign, AlertCircle, Edit, Printer, CheckCircle } from 'lucide-react';
-import { mockDebts } from '../data/mockData';
+import {
+  ArrowLeft,
+  FileText,
+  Phone,
+  Calendar,
+  DollarSign,
+  AlertCircle,
+  Edit,
+  Printer,
+  CheckCircle,
+  Building2,
+  X,
+} from 'lucide-react';
+import { useWarehouse } from '../context/WarehouseContext';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
+import { debtLineProductName } from '../lib/productLocale';
+
+const GENERAL_PRODUCT = '__general__';
+const LINE_PREFIX = 'line:';
 
 export default function DebtDetail() {
   const { id } = useParams();
-  const debt = mockDebts.find(d => d.id === id);
+  const { debts, products, applyDebtPayment, appendAudit } = useWarehouse();
+  const { user } = useAuth();
+  const { t, locale } = useI18n();
+  const isDirector = user?.role === 'director';
+  const debt = debts.find((d) => d.id === id);
+
+  const [payOpen, setPayOpen] = useState(false);
+  const [personName, setPersonName] = useState('');
+  const [companyPay, setCompanyPay] = useState('');
+  const [amountPay, setAmountPay] = useState('');
+  const [productKey, setProductKey] = useState(GENERAL_PRODUCT);
 
   if (!debt) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="font-semibold text-slate-900 mb-2">Долг не найден</h3>
+          <h3 className="font-semibold text-slate-900 mb-2">{t("debtDetail.notFound")}</h3>
           <Link to="/debts" className="text-slate-600 hover:underline">
-            К списку долгов
+            {t("debtDetail.backList")}
           </Link>
         </div>
       </div>
@@ -23,34 +52,106 @@ export default function DebtDetail() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-50 text-green-700 border-green-200';
-      case 'active': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'partial': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'overdue': return 'bg-red-50 text-red-700 border-red-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+      case 'paid':
+        return 'bg-green-50 text-green-700 border-green-200';
+      case 'active':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'partial':
+        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'overdue':
+        return 'bg-red-50 text-red-700 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'paid': return 'Оплачено';
-      case 'active': return 'Активен';
-      case 'partial': return 'Частично';
-      case 'overdue': return 'Просрочен';
-      default: return status;
+      case 'paid':
+        return t('common.debtStatusPaid');
+      case 'active':
+        return t('common.debtStatusActive');
+      case 'partial':
+        return t('common.debtStatusPartial');
+      case 'overdue':
+        return t('common.debtStatusOverdue');
+      default:
+        return status;
     }
   };
 
-  const paymentPercentage = (debt.paidAmount / debt.totalAmount) * 100;
+  const paymentPercentage =
+    debt.totalAmount <= 0 ? 0 : (debt.paidAmount / debt.totalAmount) * 100;
+
+  const resolveProductName = (key: string) => {
+    if (key === GENERAL_PRODUCT) return t('debtDetail.generalPayment');
+    if (key.startsWith(LINE_PREFIX)) {
+      const idx = Number(key.slice(LINE_PREFIX.length));
+      const row = debt.products[idx];
+      if (!row) return '—';
+      const nm = debtLineProductName(row.productId, row.productName, products, locale);
+      return debt.products.length > 1 ? `${nm} ${t('debtDetail.positionN').replace('{n}', String(idx + 1))}` : nm;
+    }
+    const row = debt.products.find((pr) => pr.productId === key);
+    if (!row) return '—';
+    return debtLineProductName(row.productId, row.productName, products, locale);
+  };
+
+  const resolvePaymentProductId = (key: string): string => {
+    if (key === GENERAL_PRODUCT) return GENERAL_PRODUCT;
+    if (key.startsWith(LINE_PREFIX)) {
+      const idx = Number(key.slice(LINE_PREFIX.length));
+      return debt.products[idx]?.productId ?? GENERAL_PRODUCT;
+    }
+    return key;
+  };
+
+  const submitPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !isDirector) return;
+    const amt = Number(amountPay);
+    const result = applyDebtPayment(id, {
+      personName: personName.trim(),
+      company: companyPay.trim(),
+      amount: amt,
+      productId: resolvePaymentProductId(productKey),
+      productName: resolveProductName(productKey),
+    });
+    if (!result.ok) {
+      toast.error(result.error ?? 'Ошибка');
+      return;
+    }
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: 'director',
+      action: 'Оплата',
+      entity: 'Долг',
+      details: `${debt.fullName}: ${amt.toLocaleString()} UZS`,
+      ip: '—',
+    });
+    toast.success('Оплата записана в историю');
+    setPayOpen(false);
+    setPersonName('');
+    setCompanyPay('');
+    setAmountPay('');
+    setProductKey(GENERAL_PRODUCT);
+  };
+
+  const history = debt.debtHistory ?? [];
+  const legacyPayments = debt.paymentHistory ?? [];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
-      {/* Header */}
       <div className="mb-6">
         <Link to="/debts" className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-4">
           <ArrowLeft className="w-5 h-5" />
-          <span>К списку долгов</span>
+          <span>К списку должников</span>
         </Link>
+        {!isDirector && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Режим просмотра: оплату и изменения вносит директор. Оформление долга выполняется один раз при создании записи.
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center">
@@ -62,40 +163,119 @@ export default function DebtDetail() {
                 <Phone className="w-4 h-4 text-slate-600" />
                 <span className="text-slate-600">{debt.phone}</span>
               </div>
+              {debt.company && (
+                <div className="flex items-center gap-2 mt-1 text-slate-600">
+                  <Building2 className="w-4 h-4" />
+                  <span>{debt.company}</span>
+                </div>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {debt.status !== 'paid' && (
+          <div className="flex flex-wrap items-center gap-2">
+            {isDirector && debt.status !== 'paid' && (
               <button
                 type="button"
-                onClick={() => toast.success('Отмечено как оплачено', { description: 'В полной версии сумма и статус обновятся.' })}
+                onClick={() => setPayOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
               >
                 <CheckCircle className="w-4 h-4" />
-                <span>Отметить оплаченным</span>
+                <span>Записать оплату</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => toast.info('Редактирование долга', { description: debt.fullName })}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
-            >
-              <Edit className="w-4 h-4" />
-              <span>Изменить</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => toast.info('Печать', { description: 'Открыть печать в полной версии.' })}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Печать</span>
-            </button>
+            {isDirector && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => toast.info('Редактирование долга', { description: debt.fullName })}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Изменить</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toast.info('Печать', { description: 'В полной версии — печать счёта.' })}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Печать</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Status Alert */}
+      {payOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Запись оплаты</h2>
+              <button type="button" onClick={() => setPayOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitPayment} className="space-y-3">
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Фамилия и имя</label>
+                <input
+                  required
+                  value={personName}
+                  onChange={(e) => setPersonName(e.target.value)}
+                  placeholder="Иванов Иван"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Компания</label>
+                <input
+                  value={companyPay}
+                  onChange={(e) => setCompanyPay(e.target.value)}
+                  placeholder="ООО «Пример»"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Сумма (UZS), не больше {debt.remainingAmount.toLocaleString()}</label>
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={debt.remainingAmount}
+                  value={amountPay}
+                  onChange={(e) => setAmountPay(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Товар / основание погашения</label>
+                <select
+                  value={productKey}
+                  onChange={(e) => setProductKey(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                >
+                  <option value={GENERAL_PRODUCT}>Общее погашение</option>
+                  {debt.products.map((p, idx) => (
+                    <option key={`${p.productId}-${idx}`} value={`${LINE_PREFIX}${idx}`}>
+                      {debtLineProductName(p.productId, p.productName, products, locale)} ({p.quantity} × {p.price.toLocaleString()} UZS)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Выберите позицию из долга или общее погашение.</p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setPayOpen(false)} className="px-4 py-2 border rounded-lg">
+                  Отмена
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  Сохранить в историю
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {debt.status === 'overdue' && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
           <div className="flex items-start gap-3">
@@ -116,9 +296,7 @@ export default function DebtDetail() {
             </div>
             <div>
               <p className="text-sm text-slate-600">Сумма долга</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {debt.totalAmount.toLocaleString()}
-              </p>
+              <p className="text-2xl font-bold text-slate-900">{debt.totalAmount.toLocaleString()}</p>
             </div>
           </div>
           <p className="text-xs text-slate-600 mt-1">UZS</p>
@@ -131,9 +309,7 @@ export default function DebtDetail() {
             </div>
             <div>
               <p className="text-sm text-slate-600">Оплачено</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                {debt.paidAmount.toLocaleString()}
-              </p>
+              <p className="text-2xl font-bold text-emerald-600">{debt.paidAmount.toLocaleString()}</p>
             </div>
           </div>
           <p className="text-xs text-slate-600 mt-1">UZS</p>
@@ -146,9 +322,7 @@ export default function DebtDetail() {
             </div>
             <div>
               <p className="text-sm text-slate-600">Остаток</p>
-              <p className="text-2xl font-bold text-red-600">
-                {debt.remainingAmount.toLocaleString()}
-              </p>
+              <p className="text-2xl font-bold text-red-600">{debt.remainingAmount.toLocaleString()}</p>
             </div>
           </div>
           <p className="text-xs text-slate-600 mt-1">UZS</p>
@@ -160,15 +334,12 @@ export default function DebtDetail() {
         <div className="mb-3">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-slate-600">Оплачено {paymentPercentage.toFixed(1)}%</span>
-            <span className={`font-medium ${getStatusColor(debt.status)}`}>
+            <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusColor(debt.status)}`}>
               {getStatusLabel(debt.status)}
             </span>
           </div>
           <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-green-500 rounded-full transition-all"
-              style={{ width: `${paymentPercentage}%` }}
-            />
+            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${Math.min(100, paymentPercentage)}%` }} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
@@ -184,79 +355,93 @@ export default function DebtDetail() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Товары</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-slate-200">
-              <tr>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Товар</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Кол-во</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Цена</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Сумма</th>
+        <h3 className="font-semibold text-slate-900 mb-4">Товары по долгу</h3>
+        {debt.products.length === 0 ? (
+          <p className="text-slate-600 text-sm">Позиции не указаны — в форме оплаты доступно только «Общее погашение».</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b border-slate-200">
+                <tr>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">Товар</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">Кол-во</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">Цена</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">Сумма</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {debt.products.map((product, index) => (
+                  <tr key={index}>
+                    <td className="py-3 text-slate-900">{debtLineProductName(product.productId, product.productName, products, locale)}</td>
+                    <td className="py-3 text-slate-600">{product.quantity}</td>
+                    <td className="py-3 text-slate-600">{product.price.toLocaleString()} UZS</td>
+                    <td className="py-3 font-medium text-slate-900">{(product.quantity * product.price).toLocaleString()} UZS</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-slate-300">
+                <tr>
+                  <td colSpan={3} className="py-3 font-semibold text-slate-900">
+                    Итого
+                  </td>
+                  <td className="py-3 font-bold text-slate-900">{debt.totalAmount.toLocaleString()} UZS</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6 overflow-x-auto">
+        <h3 className="font-semibold text-slate-900 mb-4">История погашения долга</h3>
+        {history.length > 0 ? (
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-600">
+                <th className="py-2 pr-3 font-medium">Дата</th>
+                <th className="py-2 pr-3 font-medium">Фамилия, имя</th>
+                <th className="py-2 pr-3 font-medium">Компания</th>
+                <th className="py-2 pr-3 font-medium text-right">Сумма</th>
+                <th className="py-2 pr-3 font-medium">Товар / основание</th>
+                <th className="py-2 pr-3 font-medium text-right">Остаток</th>
+                <th className="py-2 pr-3 font-medium text-right">% оплачено</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {debt.products.map((product, index) => (
-                <tr key={index}>
-                  <td className="py-3 text-slate-900">{product.productName}</td>
-                  <td className="py-3 text-slate-600">{product.quantity}</td>
-                  <td className="py-3 text-slate-600">{product.price.toLocaleString()} UZS</td>
-                  <td className="py-3 font-medium text-slate-900">
-                    {(product.quantity * product.price).toLocaleString()} UZS
+              {history.map((h) => (
+                <tr key={h.id} className="text-slate-800">
+                  <td className="py-3 pr-3 whitespace-nowrap">{h.date}</td>
+                  <td className="py-3 pr-3">{h.personName}</td>
+                  <td className="py-3 pr-3">{h.company}</td>
+                  <td className="py-3 pr-3 text-right font-medium text-emerald-700">+{h.amount.toLocaleString()}</td>
+                  <td className="py-3 pr-3">{debtLineProductName(h.productId, h.productName, products, locale)}</td>
+                  <td className="py-3 pr-3 text-right">
+                    {h.fullyPaid ? (
+                      <span className="text-emerald-700 font-medium">Полностью</span>
+                    ) : (
+                      <span>{h.remainingAfter.toLocaleString()} UZS</span>
+                    )}
                   </td>
+                  <td className="py-3 pr-3 text-right font-semibold text-slate-900">{h.paidPercentOfTotal.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="border-t-2 border-slate-300">
-              <tr>
-                <td colSpan={3} className="py-3 font-semibold text-slate-900">Итого</td>
-                <td className="py-3 font-bold text-slate-900">
-                  {debt.totalAmount.toLocaleString()} UZS
-                </td>
-              </tr>
-            </tfoot>
           </table>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-900">История оплат</h3>
-          {debt.status !== 'paid' && (
-            <button
-              type="button"
-              onClick={() => toast.info('Добавить оплату', { description: 'В полной версии откроется форма ввода суммы.' })}
-              className="text-sm text-slate-600 hover:underline"
-            >
-              Добавить оплату
-            </button>
-          )}
-        </div>
-        
-        {debt.paymentHistory.length > 0 ? (
-          <div className="space-y-3">
-            {debt.paymentHistory.map((payment, index) => (
-              <div key={index} className="flex items-center justify-between pb-3 border-b border-slate-100 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900">Оплата получена</p>
-                    <p className="text-sm text-slate-600">{payment.method}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-emerald-600">+{payment.amount.toLocaleString()} UZS</p>
-                  <p className="text-xs text-slate-600">{payment.date}</p>
-                </div>
+        ) : legacyPayments.length > 0 ? (
+          <div className="space-y-2 text-slate-600 text-sm">
+            <p className="text-slate-500 mb-2">Ранние записи (без детализации):</p>
+            {legacyPayments.map((payment, index) => (
+              <div key={index} className="flex justify-between border-b border-slate-100 pb-2">
+                <span>{payment.date}</span>
+                <span className="font-medium text-emerald-700">+{payment.amount.toLocaleString()} UZS</span>
+                <span className="text-slate-500">{payment.method}</span>
               </div>
             ))}
           </div>
         ) : (
           <div className="text-center py-8">
             <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-600">Пока нет оплат</p>
+            <p className="text-slate-600">Пока нет оплат — нажмите «Записать оплату».</p>
           </div>
         )}
       </div>

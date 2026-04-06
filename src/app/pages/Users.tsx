@@ -10,7 +10,7 @@ export default function Users() {
 
   const filteredUsers = mockUsers.filter(user => {
     const matchesSearch = user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          user.phone.includes(searchQuery);
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
@@ -163,7 +163,7 @@ export default function Users() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">{user.fullName}</p>
-                        <p className="text-sm text-gray-600">{user.email}</p>
+                        <p className="text-sm text-gray-600">@{user.username}</p>
                       </div>
                     </div>
                   </td>

@@ -1,14 +1,15 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
+import Analytics from "./pages/Analytics";
+import Audit from "./pages/Audit";
+import WorkerKPI from "./pages/WorkerKPI";
 import Debts from "./pages/Debts";
 import DebtDetail from "./pages/DebtDetail";
-import Analytics from "./pages/Analytics";
-import Users from "./pages/Users";
-import Settings from "./pages/Settings";
+import Workers from "./pages/Workers";
 import Layout from "./components/Layout";
+import { DirectorOnly, DirectorOrWorker, RoleHomeRedirect } from "./components/RoleGate";
 import { useAuth } from "./context/AuthContext";
 
 function ProtectedLayout() {
@@ -26,14 +27,72 @@ export const router = createBrowserRouter([
     path: "/",
     Component: ProtectedLayout,
     children: [
-      { index: true, Component: Dashboard },
-      { path: "products", Component: Products },
-      { path: "products/:id", Component: ProductDetail },
-      { path: "debts", Component: Debts },
-      { path: "debts/:id", Component: DebtDetail },
-      { path: "analytics", Component: Analytics },
-      { path: "users", Component: Users },
-      { path: "settings", Component: Settings },
+      { index: true, Component: RoleHomeRedirect },
+      {
+        path: "analytics",
+        element: (
+          <DirectorOnly>
+            <Analytics />
+          </DirectorOnly>
+        ),
+      },
+      {
+        path: "audit",
+        element: (
+          <DirectorOnly>
+            <Audit />
+          </DirectorOnly>
+        ),
+      },
+      {
+        path: "worker-kpi",
+        element: (
+          <DirectorOnly>
+            <WorkerKPI />
+          </DirectorOnly>
+        ),
+      },
+      {
+        path: "debts",
+        element: (
+          <DirectorOrWorker>
+            <Debts />
+          </DirectorOrWorker>
+        ),
+      },
+      {
+        path: "debts/:id",
+        element: (
+          <DirectorOrWorker>
+            <DebtDetail />
+          </DirectorOrWorker>
+        ),
+      },
+      {
+        path: "workers",
+        element: (
+          <DirectorOnly>
+            <Workers />
+          </DirectorOnly>
+        ),
+      },
+      {
+        path: "products",
+        element: (
+          <DirectorOrWorker>
+            <Products />
+          </DirectorOrWorker>
+        ),
+      },
+      {
+        path: "products/:id",
+        element: (
+          <DirectorOrWorker>
+            <ProductDetail />
+          </DirectorOrWorker>
+        ),
+      },
+      { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ]);

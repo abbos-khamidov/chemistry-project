@@ -1,62 +1,396 @@
-import { useState } from 'react';
-import { Link } from 'react-router';
-import { toast } from 'sonner';
-import { Plus, Search, Filter, Grid, List, AlertCircle, Package, ChevronRight } from 'lucide-react';
-import { mockProducts } from '../data/mockData';
+import { useState, useRef } from "react";
+import { Link } from "react-router";
+import { toast } from "sonner";
+import { Plus, Search, Filter, Grid, List, AlertCircle, Package, ChevronRight, X, ImageIcon } from "lucide-react";
+import { useWarehouse } from "../context/WarehouseContext";
+import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/I18nContext";
+import { productName, productCategory } from "../lib/productLocale";
+
+const MAX_IMAGE_BYTES = 600 * 1024;
 
 export default function Products() {
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const { products, addProduct, appendAudit } = useWarehouse();
+  const { user } = useAuth();
+  const { t, locale } = useI18n();
+  const isDirector = user?.role === "director";
 
-  const filteredProducts = mockProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("Chemicals");
+  const [quantity, setQuantity] = useState("");
+  const [unit, setUnit] = useState("L");
+  const [price, setPrice] = useState("");
+  const [supplier, setSupplier] = useState("");
+  const [expirationDate, setExpirationDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [nameUz, setNameUz] = useState("");
+  const [categoryUz, setCategoryUz] = useState("");
+  const [workerPhotoDataUrl, setWorkerPhotoDataUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredProducts = products.filter((product) => {
+    const q = searchQuery.toLowerCase();
+    const blob = [product.name, product.nameUz ?? "", product.category, product.categoryUz ?? ""].join(" ").toLowerCase();
+    const matchesSearch = !q.trim() || blob.includes(q);
+    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
+    const matchesStatus = statusFilter === "all" || product.status === statusFilter;
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'in-stock': return 'bg-green-50 text-green-700 border-green-200';
-      case 'low-stock': return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'out-of-stock': return 'bg-red-50 text-red-700 border-red-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+      case "in-stock":
+        return "bg-green-50 text-green-700 border-green-200";
+      case "low-stock":
+        return "bg-orange-50 text-orange-700 border-orange-200";
+      case "out-of-stock":
+        return "bg-red-50 text-red-700 border-red-200";
+      default:
+        return "bg-gray-50 text-gray-700 border-gray-200";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'in-stock': return 'В наличии';
-      case 'low-stock': return 'Мало';
-      case 'out-of-stock': return 'Нет в наличии';
-      default: return status;
+      case "in-stock":
+        return t("common.productStatusInStock");
+      case "low-stock":
+        return t("common.productStatusLow");
+      case "out-of-stock":
+        return t("common.productStatusOut");
+      default:
+        return status;
     }
+  };
+
+  const categories = Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
+
+  const resetForm = () => {
+    setName("");
+    setNameUz("");
+    setCategoryUz("");
+    setQuantity("");
+    setPrice("");
+    setSupplier("");
+    setNotes("");
+    setWorkerPhotoDataUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const onWorkerPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("products.toastImage"));
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error(t("products.toastImageBig"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = reader.result;
+      if (typeof r === "string") setWorkerPhotoDataUrl(r);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submitProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = Number(quantity);
+    const pr = Number(price);
+    if (!name.trim() || !Number.isFinite(q) || !Number.isFinite(pr)) {
+      toast.error(t("products.toastCheck"));
+      return;
+    }
+
+    if (!isDirector) {
+      addProduct({
+        name: name.trim(),
+        imageUrl: workerPhotoDataUrl || undefined,
+        category: "Прочее",
+        quantity: q,
+        unit: "шт",
+        price: pr,
+        supplier: "—",
+        expirationDate: new Date().toISOString().slice(0, 10),
+        createdBy: user?.fullName ?? "Сотрудник",
+      });
+    } else {
+      addProduct({
+        name: name.trim(),
+        nameUz: nameUz.trim() || undefined,
+        category: category || "Прочее",
+        categoryUz: categoryUz.trim() || undefined,
+        quantity: q,
+        unit: unit.trim() || "шт",
+        price: pr,
+        supplier: supplier.trim() || "—",
+        expirationDate: expirationDate || new Date().toISOString().slice(0, 10),
+        notes: notes.trim() || undefined,
+        createdBy: user?.fullName ?? "Сотрудник",
+      });
+    }
+    appendAudit({
+      userName: user?.fullName ?? "—",
+      userRole: isDirector ? "director" : "worker",
+      action: "Создание",
+      entity: "Товар",
+      details: name.trim(),
+      ip: "—",
+    });
+    toast.success(isDirector ? t("products.toastAddedDirector") : t("products.toastAddedWorker"));
+    setModalOpen(false);
+    resetForm();
+  };
+
+  const productThumb = (imageUrl: string | undefined, size: "grid" | "table") => {
+    const cls =
+      size === "grid"
+        ? "w-full max-w-[300px] aspect-square mx-auto mb-4 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
+        : "w-[80px] h-[80px] bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden";
+    if (imageUrl) {
+      return (
+        <div className={cls}>
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        </div>
+      );
+    }
+    return (
+      <div className={cls}>
+        <Package className={size === "grid" ? "w-16 h-16 text-slate-400" : "w-8 h-8 text-slate-400"} />
+      </div>
+    );
   };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Товары и склад</h1>
-            <p className="text-slate-600 mt-1">На складе {filteredProducts.length} товаров</p>
+            <h1 className="text-2xl font-bold text-slate-900">{t("products.pageTitle")}</h1>
+            <p className="text-slate-600 mt-1">{t("products.positionsCount").replace("{count}", String(filteredProducts.length))}</p>
+            {!isDirector && (
+              <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3 max-w-2xl">
+                {t("products.workerHint")}
+              </p>
+            )}
           </div>
           <button
             type="button"
-            onClick={() => toast.info('Добавление товара', { description: 'В полной версии откроется форма. Сейчас данные только в демо.' })}
+            onClick={() => setModalOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
             <Plus className="w-5 h-5" />
-            <span>Добавить товар</span>
+            <span>{isDirector ? t("products.addDirector") : t("products.addWorker")}</span>
           </button>
         </div>
       </div>
 
-      {/* Filters */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {isDirector ? t("products.modalNewDirector") : t("products.modalNewWorker")}
+              </h2>
+              <button type="button" onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitProduct} className="space-y-3">
+              {!isDirector ? (
+                <>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.photoOptional")}</label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 text-sm">
+                        <ImageIcon className="w-4 h-4 text-slate-600" />
+                        {t("products.chooseFile")}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={onWorkerPhoto}
+                        />
+                      </label>
+                      {workerPhotoDataUrl && (
+                        <button
+                          type="button"
+                          className="text-sm text-red-600 hover:underline"
+                          onClick={() => {
+                            setWorkerPhotoDataUrl(null);
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                        >
+                          {t("products.removePhoto")}
+                        </button>
+                      )}
+                    </div>
+                    {workerPhotoDataUrl && (
+                      <div className="mt-2 w-32 h-32 rounded-lg border border-slate-200 overflow-hidden">
+                        <img src={workerPhotoDataUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelName")}</label>
+                    <input
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelQty")}</label>
+                      <input
+                        required
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelPriceUzs")}</label>
+                      <input
+                        required
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelNameDirector")}</label>
+                    <input
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("common.nameUz")}</label>
+                    <input
+                      value={nameUz}
+                      onChange={(e) => setNameUz(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      placeholder={locale === "uz" ? "" : "ixtiyoriy"}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelCategory")}</label>
+                      <input
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t("common.categoryUz")}</label>
+                      <input
+                        value={categoryUz}
+                        onChange={(e) => setCategoryUz(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        placeholder={locale === "uz" ? "" : "ixtiyoriy"}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelUnit")}</label>
+                    <input
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 max-w-md"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelQty")}</label>
+                      <input
+                        required
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelPriceUzs")}</label>
+                      <input
+                        required
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelSupplier")}</label>
+                    <input
+                      value={supplier}
+                      onChange={(e) => setSupplier(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelExp")}</label>
+                    <input
+                      type="date"
+                      value={expirationDate}
+                      onChange={(e) => setExpirationDate(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelNotes")}</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={2}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border rounded-lg">
+                  {t("common.cancel")}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  {t("common.save")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2">
@@ -64,7 +398,7 @@ export default function Products() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Поиск товаров..."
+                placeholder={t("products.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
@@ -77,9 +411,16 @@ export default function Products() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
           >
-            <option value="all">Все категории</option>
-            <option value="Chemicals">Химикаты</option>
-            <option value="Safety Equipment">СИЗ</option>
+            <option value="all">{t("products.filterAllCat")}</option>
+            <option value="Chemicals">{t("products.catChemicals")}</option>
+            <option value="Safety Equipment">{t("products.catSafety")}</option>
+            {categories
+              .filter((c) => c !== "Chemicals" && c !== "Safety Equipment")
+              .map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
           </select>
 
           <select
@@ -87,33 +428,31 @@ export default function Products() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
           >
-            <option value="all">Все статусы</option>
-            <option value="in-stock">В наличии</option>
-            <option value="low-stock">Мало</option>
-            <option value="out-of-stock">Нет в наличии</option>
+            <option value="all">{t("products.filterAllStatus")}</option>
+            <option value="in-stock">{t("common.productStatusInStock")}</option>
+            <option value="low-stock">{t("common.productStatusLow")}</option>
+            <option value="out-of-stock">{t("common.productStatusOut")}</option>
           </select>
         </div>
 
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-600" />
-            <span className="text-sm text-slate-600">
-              Найдено: {filteredProducts.length}
-            </span>
+            <span className="text-sm text-slate-600">{t("products.foundLine")}: {filteredProducts.length}</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-slate-100 text-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-slate-100 text-slate-700" : "text-slate-600 hover:bg-slate-100"}`}
             >
               <Grid className="w-5 h-5" />
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded-lg ${viewMode === 'table' ? 'bg-slate-100 text-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}
+              onClick={() => setViewMode("table")}
+              className={`p-2 rounded-lg ${viewMode === "table" ? "bg-slate-100 text-slate-700" : "text-slate-600 hover:bg-slate-100"}`}
             >
               <List className="w-5 h-5" />
             </button>
@@ -121,8 +460,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Grid View */}
-      {viewMode === 'grid' && (
+      {viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map((product) => (
             <Link
@@ -130,45 +468,44 @@ export default function Products() {
               to={`/products/${product.id}`}
               className="bg-white rounded-xl border border-slate-200/80 p-6 hover:border-slate-400 hover:shadow-md transition-all"
             >
-              {/* Место для фото товара (до 300×300) */}
-              <div className="w-full max-w-[300px] aspect-square mx-auto mb-4 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                <Package className="w-16 h-16 text-slate-400" />
-              </div>
+              {productThumb(product.imageUrl, "grid")}
               <div className="flex items-start justify-between mb-2">
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusColor(product.status)}`}>
                   {getStatusLabel(product.status)}
                 </span>
               </div>
 
-              <h3 className="font-semibold text-slate-900 mb-1">{product.name}</h3>
-              <p className="text-sm text-slate-600 mb-3">{product.category}</p>
+              <h3 className="font-semibold text-slate-900 mb-1">{productName(product, locale)}</h3>
+              <p className="text-sm text-slate-600 mb-3">{productCategory(product, locale)}</p>
 
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Кол-во:</span>
-                  <span className="font-medium text-slate-900">{product.quantity} {product.unit}</span>
+                  <span className="text-slate-600">{t("common.qty")}:</span>
+                  <span className="font-medium text-slate-900">
+                    {product.quantity} {product.unit}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Цена:</span>
+                  <span className="text-slate-600">{t("products.colPrice")}:</span>
                   <span className="font-medium text-slate-900">{product.price.toLocaleString()} UZS</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Поставщик:</span>
+                  <span className="text-slate-600">{t("products.colSupplier")}:</span>
                   <span className="font-medium text-slate-900 truncate ml-2">{product.supplier}</span>
                 </div>
               </div>
 
-              {product.status === 'low-stock' && (
+              {product.status === "low-stock" && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
                   <AlertCircle className="w-4 h-4" />
-                  <span>Скоро пополнить</span>
+                  <span>{t("products.lowStockBanner")}</span>
                 </div>
               )}
 
-              {product.status === 'out-of-stock' && (
+              {product.status === "out-of-stock" && (
                 <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
                   <AlertCircle className="w-4 h-4" />
-                  <span>Нет в наличии</span>
+                  <span>{t("products.outStockBanner")}</span>
                 </div>
               )}
             </Link>
@@ -176,36 +513,33 @@ export default function Products() {
         </div>
       )}
 
-      {/* Table View */}
-      {viewMode === 'table' && (
+      {viewMode === "table" && (
         <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Фото</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Товар</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Категория</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Кол-во</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Цена</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Поставщик</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">Статус</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colPhoto")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colProduct")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colCategory")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colQtyShort")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colPrice")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colSupplier")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colStatus")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredProducts.map((product) => (
                   <tr key={product.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">{productThumb(product.imageUrl, "table")}</td>
                     <td className="px-6 py-4">
-                      <div className="w-[80px] h-[80px] bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Package className="w-8 h-8 text-slate-400" />
-                      </div>
+                      <p className="font-medium text-slate-900">{productName(product, locale)}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-slate-900">{product.name}</p>
+                    <td className="px-6 py-4 text-sm text-slate-600">{productCategory(product, locale)}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                      {product.quantity} {product.unit}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{product.category}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{product.quantity} {product.unit}</td>
                     <td className="px-6 py-4 text-sm text-slate-900">{product.price.toLocaleString()} UZS</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{product.supplier}</td>
                     <td className="px-6 py-4">
@@ -226,18 +560,21 @@ export default function Products() {
         </div>
       )}
 
-      {/* Empty State */}
       {filteredProducts.length === 0 && (
         <div className="bg-white rounded-xl border border-slate-200/80 p-12 text-center">
           <Package className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="font-semibold text-slate-900 mb-2">Товары не найдены</h3>
-          <p className="text-slate-600 mb-4">Измените фильтры или поиск</p>
+          <h3 className="font-semibold text-slate-900 mb-2">{t("products.emptyTitle")}</h3>
+          <p className="text-slate-600 mb-4">{t("products.emptyHint")}</p>
           <button
             type="button"
-            onClick={() => { setSearchQuery(''); setCategoryFilter('all'); setStatusFilter('all'); }}
+            onClick={() => {
+              setSearchQuery("");
+              setCategoryFilter("all");
+              setStatusFilter("all");
+            }}
             className="text-slate-600 hover:underline"
           >
-            Сбросить фильтры
+            {t("common.resetFilters")}
           </button>
         </div>
       )}

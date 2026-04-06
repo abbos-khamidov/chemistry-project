@@ -1,29 +1,23 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import {
-  LayoutDashboard,
   Package,
-  FileText,
   BarChart3,
-  Users,
-  Settings,
   Search,
-  Bell,
   Menu,
   X,
   ChevronDown,
   LogOut,
+  FileSearch,
+  Target,
+  Wallet,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const navigation = [
-  { name: 'Дашборд', href: '/', icon: LayoutDashboard },
-  { name: 'Товары', href: '/products', icon: Package },
-  { name: 'Долги', href: '/debts', icon: FileText },
-  { name: 'Аналитика', href: '/analytics', icon: BarChart3 },
-  { name: 'Пользователи', href: '/users', icon: Users },
-  { name: 'Настройки', href: '/settings', icon: Settings },
-];
+import { useI18n } from '../i18n/I18nContext';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { BrandLogo } from './BrandLogo';
+import { NotificationsPopover } from './NotificationsPopover';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +26,24 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
+  const { t } = useI18n();
+
+  const navigation = useMemo(() => {
+    if (currentUser.role === 'director') {
+      return [
+        { nameKey: 'layout.navAnalytics', href: '/analytics', icon: BarChart3 },
+        { nameKey: 'layout.navAudit', href: '/audit', icon: FileSearch },
+        { nameKey: 'layout.navWorkerKpi', href: '/worker-kpi', icon: Target },
+        { nameKey: 'layout.navProducts', href: '/products', icon: Package },
+        { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
+        { nameKey: 'layout.navWorkers', href: '/workers', icon: Users },
+      ];
+    }
+    return [
+      { nameKey: 'layout.navProducts', href: '/products', icon: Package },
+      { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
+    ];
+  }, [currentUser.role]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -47,45 +59,60 @@ export default function Layout() {
   };
 
   const isActive = (href: string) => {
-    if (href === '/') return location.pathname === '/';
-    return location.pathname.startsWith(href);
+    if (href === '/products') return location.pathname.startsWith('/products');
+    if (href === '/debts') return location.pathname.startsWith('/debts');
+    return location.pathname === href;
   };
+
+  const searchPlaceholder =
+    currentUser.role === 'director' ? t('layout.searchDirector') : t('layout.searchWorker');
+
+  const mobileCols =
+    navigation.length >= 6
+      ? 'grid-cols-6'
+      : navigation.length >= 5
+        ? 'grid-cols-5'
+        : navigation.length >= 3
+          ? 'grid-cols-3'
+          : navigation.length >= 2
+            ? 'grid-cols-2'
+            : 'grid-cols-1';
 
   return (
     <div className="min-h-screen bg-slate-50/80">
-      {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-slate-200/80 transition-transform lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200/80">
-            <h1 className="font-semibold text-lg text-slate-800">Warehouse System</h1>
-            <button 
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden"
-            >
+          <div className="min-h-16 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 border-b border-slate-200/80">
+            <Link to="/" className="flex items-center gap-3 min-w-0 flex-1">
+              <BrandLogo className="h-9 w-auto max-w-[112px] shrink-0" />
+              <div className="min-w-0">
+                <p className="font-semibold text-sm text-slate-800 leading-tight">{t('layout.title')}</p>
+                <p className="text-[10px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{t('layout.brandTagline')}</p>
+              </div>
+            </Link>
+            <button type="button" onClick={() => setSidebarOpen(false)} className="lg:hidden shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
                 <Link
-                  key={item.name}
+                  key={item.nameKey}
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
@@ -93,7 +120,7 @@ export default function Layout() {
                   }`}
                 >
                   <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium">{t(item.nameKey)}</span>
                 </Link>
               );
             })}
@@ -108,18 +135,17 @@ export default function Layout() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-slate-800">{currentUser.fullName}</p>
-                <p className="text-xs text-slate-500 capitalize">{currentUser.role}</p>
+                <p className="text-xs text-slate-500">{currentUser.role === 'director' ? t('layout.roleDirector') : t('layout.roleWorker')}</p>
               </div>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200/80">
           <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-600">
+            <button type="button" onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-600">
               <Menu className="w-6 h-6" />
             </button>
 
@@ -128,21 +154,19 @@ export default function Layout() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Поиск товаров, долгов..."
+                  placeholder={searchPlaceholder}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800 placeholder:text-slate-400"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="hidden md:block px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-full capitalize">
-                {currentUser.role}
+              <LanguageSwitcher />
+              <div className="hidden md:block px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-full">
+                {currentUser.role === 'director' ? t('layout.roleDirector') : t('layout.roleWorker')}
               </div>
 
-              <button type="button" className="relative p-2 hover:bg-slate-100 rounded-lg text-slate-600">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full" />
-              </button>
+              <NotificationsPopover />
 
               <div className="relative" ref={profileRef}>
                 <button
@@ -161,7 +185,7 @@ export default function Layout() {
                   <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50">
                     <div className="px-3 py-2 border-b border-slate-100">
                       <p className="text-sm font-medium text-slate-800 truncate">{currentUser.fullName}</p>
-                      <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
+                      <p className="text-xs text-slate-500 truncate">{currentUser.username}</p>
                     </div>
                     <button
                       type="button"
@@ -169,7 +193,7 @@ export default function Layout() {
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                     >
                       <LogOut className="w-4 h-4" />
-                      Выйти
+                      {t('layout.logout')}
                     </button>
                   </div>
                 )}
@@ -178,35 +202,32 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="min-h-[calc(100vh-4rem)]">
+        <main className="min-h-[calc(100vh-4rem)] pb-16 lg:pb-0">
           <Outlet />
         </main>
 
         <footer className="bg-white border-t border-slate-200/80 py-4">
           <div className="px-4 sm:px-6 lg:px-8">
-            <p className="text-center text-sm text-slate-500">
-              Сделано aisolution.uz
-            </p>
+            <p className="text-center text-sm text-slate-500">{t('layout.footer')}</p>
           </div>
         </footer>
       </div>
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/80 z-30">
-        <div className="grid grid-cols-5 gap-1 px-2 py-2">
-          {navigation.slice(0, 5).map((item) => {
+        <div className={`grid ${mobileCols} gap-1 px-2 py-2`}>
+          {navigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
               <Link
-                key={item.name}
+                key={item.nameKey}
                 to={item.href}
                 className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg ${
                   active ? 'text-slate-800' : 'text-slate-600'
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{item.name}</span>
+                <span className="text-[10px] font-medium text-center leading-tight">{t(item.nameKey)}</span>
               </Link>
             );
           })}

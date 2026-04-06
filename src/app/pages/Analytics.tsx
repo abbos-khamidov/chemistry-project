@@ -1,81 +1,215 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { format, eachMonthOfInterval, parseISO } from 'date-fns';
+import { ru } from 'date-fns/locale/ru';
+import { uz } from 'date-fns/locale/uz';
 import { toast } from 'sonner';
-import { Download, Calendar, TrendingUp, TrendingDown, DollarSign, Package, FileText } from 'lucide-react';
-import { LineChart, Line, BarChart as RechartsBar, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { dashboardStats, mockProducts, mockDebts } from '../data/mockData';
-
-const monthlyInventoryData = [
-  { month: 'Oct', value: 12500000, operations: 18 },
-  { month: 'Nov', value: 13200000, operations: 20 },
-  { month: 'Dec', value: 14100000, operations: 19 },
-  { month: 'Jan', value: 12800000, operations: 17 },
-  { month: 'Feb', value: 14800000, operations: 22 },
-  { month: 'Mar', value: 15850000, operations: 24 },
-];
-
-const categoryDistribution = [
-  { name: 'Chemicals', value: 9200000, percentage: 58 },
-  { name: 'Safety Equipment', value: 4100000, percentage: 26 },
-  { name: 'Tools & Equipment', value: 2550000, percentage: 16 },
-];
-
-const debtAnalytics = [
-  { month: 'Oct', paid: 3200000, unpaid: 1800000 },
-  { month: 'Nov', paid: 2800000, unpaid: 2100000 },
-  { month: 'Dec', paid: 4100000, unpaid: 1500000 },
-  { month: 'Jan', paid: 3500000, unpaid: 2200000 },
-  { month: 'Feb', paid: 4200000, unpaid: 1900000 },
-  { month: 'Mar', paid: 2050000, unpaid: 2040000 },
-];
-
-const topProducts = [
-  { name: 'Sulfuric Acid 98%', quantity: 150, value: 6750000 },
-  { name: 'Sodium Hydroxide Pellets', quantity: 200, value: 2400000 },
-  { name: 'Hydrogen Peroxide 30%', quantity: 80, value: 2240000 },
-  { name: 'Protective Masks N95', quantity: 15, value: 1275000 },
-  { name: 'Safety Gloves Industrial', quantity: 25, value: 375000 },
-];
+import { Download, Calendar, TrendingUp, TrendingDown, Banknote, Package, FileText } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  BarChart as RechartsBar,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+import { useWarehouse } from '../context/WarehouseContext';
+import { useI18n } from '../i18n/I18nContext';
+import { dateInRange } from '../lib/warehouseUtils';
+import { exportAnalyticsToXlsx } from '../lib/exportAnalyticsXlsx';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-const totalWarehouseValue = mockProducts.reduce((sum, p) => sum + p.price * p.quantity, 0);
-const totalDebtsRemaining = mockDebts.filter((d) => d.status !== 'paid').reduce((sum, d) => sum + d.remainingAmount, 0);
-const collectedThisMonth = dashboardStats.collectedThisMonth;
+function defaultRange() {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  return {
+    start: format(start, 'yyyy-MM-dd'),
+    end: format(end, 'yyyy-MM-dd'),
+  };
+}
 
 export default function Analytics() {
-  const [dateRange, setDateRange] = useState('last-6-months');
+  const { products, debts } = useWarehouse();
+  const { t, formatUzs, locale } = useI18n();
+  const dateFnsLocale = useMemo(() => (locale === 'uz' ? uz : ru), [locale]);
+  const dr = defaultRange();
+  const [startDate, setStartDate] = useState(dr.start);
+  const [endDate, setEndDate] = useState(dr.end);
+
+  const stats = useMemo(() => {
+    const totalWarehouseValue = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
+    const totalDebtsRemaining = debts
+      .filter((d) => d.status !== 'paid')
+      .reduce((sum, d) => sum + d.remainingAmount, 0);
+    let operationsInRange = 0;
+    for (const p of products) {
+      for (const h of p.history) {
+        if (dateInRange(h.date, startDate, endDate)) operationsInRange++;
+      }
+    }
+    let collectedInRange = 0;
+    for (const d of debts) {
+      for (const ph of d.paymentHistory) {
+        if (dateInRange(ph.date, startDate, endDate)) collectedInRange += ph.amount;
+      }
+    }
+    const overdueDebts = debts.filter((d) => d.status === 'overdue').length;
+    return {
+      totalWarehouseValue,
+      totalDebtsRemaining,
+      collectedInRange,
+      operationsInRange,
+      overdueDebts,
+    };
+  }, [products, debts, startDate, endDate]);
+
+  const monthlyInventoryData = useMemo(() => {
+    try {
+      const start = parseISO(startDate);
+      const end = parseISO(endDate);
+      if (start > end) return [];
+      const months = eachMonthOfInterval({ start, end });
+      return months.map((m) => {
+        const key = format(m, 'yyyy-MM');
+        let operations = 0;
+        let valueDelta = 0;
+        for (const p of products) {
+          for (const h of p.history) {
+            if (h.date.slice(0, 7) !== key) continue;
+            if (!dateInRange(h.date, startDate, endDate)) continue;
+            operations += 1;
+            valueDelta += Math.abs(h.quantity) * p.price;
+          }
+        }
+        return {
+          month: format(m, 'LLL yy', { locale: dateFnsLocale }),
+          value: valueDelta,
+          operations,
+        };
+      });
+    } catch {
+      return [];
+    }
+  }, [products, startDate, endDate, dateFnsLocale]);
+
+  const debtAnalytics = useMemo(() => {
+    try {
+      const start = parseISO(startDate);
+      const end = parseISO(endDate);
+      if (start > end) return [];
+      const months = eachMonthOfInterval({ start, end });
+      return months.map((m) => {
+        const key = format(m, 'yyyy-MM');
+        let paid = 0;
+        for (const d of debts) {
+          for (const ph of d.paymentHistory) {
+            if (ph.date.slice(0, 7) === key && dateInRange(ph.date, startDate, endDate)) {
+              paid += ph.amount;
+            }
+          }
+        }
+        let unpaid = 0;
+        for (const d of debts) {
+          if (d.status === 'paid') continue;
+          if (d.issueDate.slice(0, 7) === key && dateInRange(d.issueDate, startDate, endDate)) {
+            unpaid += d.remainingAmount;
+          }
+        }
+        return { month: format(m, 'LLL yy', { locale: dateFnsLocale }), paid, unpaid };
+      });
+    } catch {
+      return [];
+    }
+  }, [debts, startDate, endDate, dateFnsLocale]);
+
+  const categoryDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of products) {
+      const v = p.price * p.quantity;
+      map.set(p.category, (map.get(p.category) ?? 0) + v);
+    }
+    const total = [...map.values()].reduce((a, b) => a + b, 0);
+    if (total <= 0) return [];
+    return [...map.entries()].map(([name, value]) => ({
+      name,
+      value,
+      percentage: Math.round((value / total) * 100),
+    }));
+  }, [products]);
+
+  const topProducts = useMemo(() => {
+    return [...products]
+      .map((p) => ({ name: p.name, quantity: p.quantity, value: p.price * p.quantity }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [products]);
 
   const handleExport = () => {
-    toast.success('Отчёт подготовлен', { description: 'Экспорт за выбранный период. В продакшене здесь будет скачивание файла.' });
+    try {
+      exportAnalyticsToXlsx({
+        startDate,
+        endDate,
+        t,
+        stats,
+        monthlyInventoryData,
+        debtAnalytics,
+        categoryDistribution,
+        topProducts,
+        totalWarehouseValue,
+      });
+      toast.success(t('analytics.exportToastTitle'), {
+        description: `${startDate} — ${endDate}. ${t('analytics.exportToastDesc')}`,
+      });
+    } catch {
+      toast.error(t('analytics.exportError'));
+    }
   };
+
+  const totalWarehouseValue = stats.totalWarehouseValue;
+  const totalDebtsRemaining = stats.totalDebtsRemaining;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
       <div className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Аналитика и отчёты</h1>
-            <p className="text-slate-600 mt-1">Показатели по складу и долгам</p>
+            <h1 className="text-2xl font-bold text-slate-900">{t('analytics.pageTitle')}</h1>
+            <p className="text-slate-600 mt-1">{t('analytics.pageSubtitle')}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
-            >
-              <option value="last-30-days">За 30 дней</option>
-              <option value="last-3-months">За 3 месяца</option>
-              <option value="last-6-months">За 6 месяцев</option>
-              <option value="last-year">За год</option>
-              <option value="custom">Свой период</option>
-            </select>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">{t('analytics.periodStart')}</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">{t('analytics.periodEnd')}</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+              />
+            </div>
             <button
               type="button"
               onClick={handleExport}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors sm:ml-auto"
             >
               <Download className="w-4 h-4" />
-              <span>Экспорт</span>
+              <span>{t('analytics.export')}</span>
             </button>
           </div>
         </div>
@@ -89,21 +223,21 @@ export default function Analytics() {
             </div>
             <TrendingUp className="w-5 h-5 text-emerald-600" />
           </div>
-          <p className="text-sm text-slate-600 mb-1">Стоимость склада</p>
-          <p className="text-2xl font-bold text-slate-900">{(totalWarehouseValue / 1_000_000).toFixed(2)}M</p>
-          <p className="text-xs text-slate-500 mt-1">UZS по текущим остаткам</p>
+          <p className="text-sm text-slate-600 mb-1">{t('analytics.cardWarehouseValue')}</p>
+          <p className="text-2xl font-bold text-slate-900 break-words">{formatUzs(totalWarehouseValue)}</p>
+          <p className="text-xs text-slate-500 mt-1">{t('analytics.cardWarehouseHint')}</p>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
+              <Banknote className="w-5 h-5 text-emerald-600" />
             </div>
             <TrendingUp className="w-5 h-5 text-emerald-600" />
           </div>
-          <p className="text-sm text-slate-600 mb-1">Собрано (март)</p>
-          <p className="text-2xl font-bold text-slate-900">{(collectedThisMonth / 1_000_000).toFixed(2)}M</p>
-          <p className="text-xs text-slate-500 mt-1">UZS</p>
+          <p className="text-sm text-slate-600 mb-1">{t('analytics.cardCollected')}</p>
+          <p className="text-2xl font-bold text-slate-900 break-words">{formatUzs(stats.collectedInRange)}</p>
+          <p className="text-xs text-slate-500 mt-1">{t('analytics.cardCollectedHint')}</p>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
@@ -113,9 +247,9 @@ export default function Analytics() {
             </div>
             <TrendingDown className="w-5 h-5 text-amber-600" />
           </div>
-          <p className="text-sm text-slate-600 mb-1">Неоплаченные долги</p>
-          <p className="text-2xl font-bold text-slate-900">{(totalDebtsRemaining / 1_000_000).toFixed(2)}M</p>
-          <p className="text-xs text-amber-600 mt-1">{dashboardStats.overdueDebts} просрочено</p>
+          <p className="text-sm text-slate-600 mb-1">{t('analytics.cardDebts')}</p>
+          <p className="text-2xl font-bold text-slate-900 break-words">{formatUzs(totalDebtsRemaining)}</p>
+          <p className="text-xs text-amber-600 mt-1">{stats.overdueDebts} {t('analytics.cardOverdue')}</p>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
@@ -125,137 +259,169 @@ export default function Analytics() {
             </div>
             <TrendingUp className="w-5 h-5 text-emerald-600" />
           </div>
-          <p className="text-sm text-slate-600 mb-1">Операций (март)</p>
-          <p className="text-2xl font-bold text-slate-900">{dashboardStats.monthlyOperations}</p>
-          <p className="text-xs text-slate-500 mt-1">движения по складу</p>
+          <p className="text-sm text-slate-600 mb-1">{t('analytics.cardOps')}</p>
+          <p className="text-2xl font-bold text-slate-900">{stats.operationsInRange}</p>
+          <p className="text-xs text-slate-500 mt-1">{t('analytics.cardOpsHint')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">Динамика стоимости склада</h3>
-            <span className="text-xs text-slate-600">За 6 месяцев</span>
+            <h3 className="font-semibold text-slate-900">{t('analytics.chartInventory')}</h3>
+            <span className="text-xs text-slate-600">
+              {startDate} — {endDate}
+            </span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={monthlyInventoryData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-              <Line type="monotone" dataKey="value" stroke="#475569" strokeWidth={3} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          {monthlyInventoryData.length === 0 ? (
+            <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartInventoryEmpty')}</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyInventoryData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip
+                  formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                />
+                <Line type="monotone" dataKey="value" stroke="#475569" strokeWidth={3} dot={{ r: 4 }} name={t('analytics.lineTurnover')} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">По категориям</h3>
-            <span className="text-xs text-slate-600">Текущее распределение</span>
+            <h3 className="font-semibold text-slate-900">{t('analytics.chartCategories')}</h3>
+            <span className="text-xs text-slate-600">{t('analytics.chartCategoriesHint')}</span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={categoryDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percentage }) => `${name} (${percentage}%)`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {categoryDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-            </PieChart>
-          </ResponsiveContainer>
+          {categoryDistribution.length === 0 ? (
+            <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartCategoriesEmpty')}</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={categoryDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percentage }: { name: string; percentage?: number }) => `${name} (${percentage ?? 0}%)`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {categoryDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">Долги: оплачено / не оплачено</h3>
-            <span className="text-xs text-slate-600">По месяцам</span>
+            <h3 className="font-semibold text-slate-900">{t('analytics.chartDebts')}</h3>
+            <span className="text-xs text-slate-600">{t('analytics.chartDebtsHint')}</span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsBar data={debtAnalytics}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-              <Legend />
-              <Bar dataKey="paid" fill="#10b981" radius={[8, 8, 0, 0]} name="Оплачено" />
-              <Bar dataKey="unpaid" fill="#ef4444" radius={[8, 8, 0, 0]} name="Не оплачено" />
-            </RechartsBar>
-          </ResponsiveContainer>
+          {debtAnalytics.length === 0 ? (
+            <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartDebtsEmpty')}</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsBar data={debtAnalytics}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip
+                  formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                />
+                <Legend />
+                <Bar dataKey="paid" fill="#10b981" radius={[8, 8, 0, 0]} name={t('analytics.barPaid')} />
+                <Bar dataKey="unpaid" fill="#ef4444" radius={[8, 8, 0, 0]} name={t('analytics.barUnpaid')} />
+              </RechartsBar>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">Операции по месяцам</h3>
-            <span className="text-xs text-slate-600">Приход / расход</span>
+            <h3 className="font-semibold text-slate-900">{t('analytics.chartMonthlyOps')}</h3>
+            <span className="text-xs text-slate-600">{t('analytics.chartMonthlyOpsHint')}</span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsBar data={monthlyInventoryData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-              <Bar dataKey="operations" fill="#64748b" radius={[8, 8, 0, 0]} />
-            </RechartsBar>
-          </ResponsiveContainer>
+          {monthlyInventoryData.length === 0 ? (
+            <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartDebtsEmpty')}</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsBar data={monthlyInventoryData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip
+                  formatter={(v: number) => [String(v), t('analytics.tooltipOps')]}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                />
+                <Bar dataKey="operations" fill="#64748b" radius={[8, 8, 0, 0]} />
+              </RechartsBar>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200/80 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-900">Топ товаров по стоимости</h3>
-          <button type="button" onClick={() => toast.info('Переход к списку товаров')} className="text-sm text-slate-600 hover:underline">
-            Все товары
-          </button>
+          <h3 className="font-semibold text-slate-900">{t('analytics.topTitle')}</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-slate-200">
-              <tr>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">#</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Товар</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Кол-во</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Стоимость</th>
-                <th className="text-left py-3 text-sm font-medium text-slate-600">Доля</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {topProducts.map((product, index) => {
-                const contribution = totalWarehouseValue > 0 ? ((product.value / totalWarehouseValue) * 100).toFixed(1) : '0';
-                return (
-                  <tr key={index} className="hover:bg-slate-50">
-                    <td className="py-4">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-semibold text-sm">
-                        {index + 1}
-                      </div>
-                    </td>
-                    <td className="py-4 font-medium text-slate-900">{product.name}</td>
-                    <td className="py-4 text-slate-600">{product.quantity}</td>
-                    <td className="py-4 font-medium text-slate-900">{product.value.toLocaleString()} UZS</td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
-                          <div className="h-full bg-slate-500 rounded-full" style={{ width: `${contribution}%` }} />
+        {topProducts.length === 0 ? (
+          <p className="text-slate-600 text-sm">{t('analytics.topEmpty')}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b border-slate-200">
+                <tr>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">{t('analytics.colNo')}</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">{t('analytics.colProduct')}</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">{t('analytics.colQty')}</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">{t('analytics.colValue')}</th>
+                  <th className="text-left py-3 text-sm font-medium text-slate-600">{t('analytics.colShare')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {topProducts.map((product, index) => {
+                  const contribution =
+                    totalWarehouseValue > 0 ? ((product.value / totalWarehouseValue) * 100).toFixed(1) : '0';
+                  return (
+                    <tr key={product.name} className="hover:bg-slate-50">
+                      <td className="py-4">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-semibold text-sm">
+                          {index + 1}
                         </div>
-                        <span className="text-sm text-slate-600">{contribution}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-4 font-medium text-slate-900">{product.name}</td>
+                      <td className="py-4 text-slate-600">{product.quantity}</td>
+                      <td className="py-4 font-medium text-slate-900">{formatUzs(product.value)}</td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
+                            <div className="h-full bg-slate-500 rounded-full" style={{ width: `${contribution}%` }} />
+                          </div>
+                          <span className="text-sm text-slate-600">{contribution}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

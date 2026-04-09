@@ -31,8 +31,6 @@ export default function DebtDetail() {
   const debt = debts.find((d) => d.id === id);
 
   const [payOpen, setPayOpen] = useState(false);
-  const [personName, setPersonName] = useState('');
-  const [companyPay, setCompanyPay] = useState('');
   const [amountPay, setAmountPay] = useState('');
   const [paymentMode, setPaymentMode] = useState<'partial' | 'full'>('partial');
   const [productKey, setProductKey] = useState(GENERAL_PRODUCT);
@@ -112,14 +110,14 @@ export default function DebtDetail() {
     if (!id || !isDirector) return;
     const amt = paymentMode === 'full' ? debt.remainingAmount : Number(amountPay);
     const result = applyDebtPayment(id, {
-      personName: personName.trim(),
-      company: companyPay.trim(),
+      personName: debt.fullName.trim(),
+      company: (debt.company ?? '').trim(),
       amount: amt,
       productId: resolvePaymentProductId(productKey),
       productName: resolveProductName(productKey),
     });
     if (!result.ok) {
-      toast.error(result.error ?? 'Ошибка');
+      toast.error(result.error ?? t('debtDetail.toastPayError'));
       return;
     }
     appendAudit({
@@ -130,10 +128,8 @@ export default function DebtDetail() {
       details: `${debt.fullName}: ${amt.toLocaleString()} UZS`,
       ip: '—',
     });
-    toast.success('Оплата записана в историю');
+    toast.success(t('debtDetail.toastPayOk'));
     setPayOpen(false);
-    setPersonName('');
-    setCompanyPay('');
     setAmountPay('');
     setPaymentMode('partial');
     setProductKey(GENERAL_PRODUCT);
@@ -212,49 +208,37 @@ export default function DebtDetail() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl border max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Запись оплаты</h2>
+              <h2 className="text-lg font-semibold">{t('debtDetail.payModalTitle')}</h2>
               <button type="button" onClick={() => setPayOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={submitPayment} className="space-y-3">
-              <div>
-                <label className="block text-sm text-slate-700 mb-1">Фамилия и имя</label>
-                <input
-                  required
-                  value={personName}
-                  onChange={(e) => setPersonName(e.target.value)}
-                  placeholder="Иванов Иван"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                />
+              <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-2">
+                <p className="text-sm font-medium text-slate-800">{t('debtDetail.payDebtorTitle')}</p>
+                <p className="text-base font-semibold text-slate-900">{debt.fullName}</p>
+                <p className="text-sm text-slate-600">{debt.phone}</p>
+                {debt.company ? <p className="text-sm text-slate-600">{debt.company}</p> : null}
+                <p className="text-xs text-slate-500 pt-1">{t('debtDetail.payDebtorHint')}</p>
               </div>
               <div>
-                <label className="block text-sm text-slate-700 mb-1">Компания</label>
-                <input
-                  value={companyPay}
-                  onChange={(e) => setCompanyPay(e.target.value)}
-                  placeholder="ООО «Пример»"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-700 mb-1">Тип погашения</label>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.repaymentType')}</label>
                 <select
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value as 'partial' | 'full')}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2"
                 >
-                  <option value="partial">Частичное погашение</option>
-                  <option value="full">Полное погашение</option>
+                  <option value="partial">{t('debtDetail.partialRepayment')}</option>
+                  <option value="full">{t('debtDetail.fullRepayment')}</option>
                 </select>
               </div>
               {paymentMode === 'full' ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <p className="text-sm text-emerald-900">К погашению: <span className="font-semibold">{debt.remainingAmount.toLocaleString()} UZS</span></p>
+                  <p className="text-sm text-emerald-900">{t('debtDetail.toSettle')}: <span className="font-semibold">{debt.remainingAmount.toLocaleString()} UZS</span></p>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1">Сумма (UZS), не больше {debt.remainingAmount.toLocaleString()}</label>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.amountUZSLabel').replace('{max}', debt.remainingAmount.toLocaleString())}</label>
                   <input
                     required
                     type="number"
@@ -267,27 +251,27 @@ export default function DebtDetail() {
                 </div>
               )}
               <div>
-                <label className="block text-sm text-slate-700 mb-1">Товар / основание погашения</label>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.productRepaymentLabel')}</label>
                 <select
                   value={productKey}
                   onChange={(e) => setProductKey(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2"
                 >
-                  <option value={GENERAL_PRODUCT}>Общее погашение</option>
+                  <option value={GENERAL_PRODUCT}>{t('debtDetail.generalPayment')}</option>
                   {debt.products.map((p, idx) => (
                     <option key={`${p.productId}-${idx}`} value={`${LINE_PREFIX}${idx}`}>
                       {debtLineProductName(p.productId, p.productName, products, locale)} ({p.quantity} × {p.price.toLocaleString()} UZS)
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-slate-500 mt-1">Выберите позицию из долга или общее погашение.</p>
+                <p className="text-xs text-slate-500 mt-1">{t('debtDetail.productRepaymentHint')}</p>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setPayOpen(false)} className="px-4 py-2 border rounded-lg">
-                  Отмена
+                  {t('debtDetail.payCancel')}
                 </button>
                 <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
-                  Сохранить в историю
+                  {t('debtDetail.paySave')}
                 </button>
               </div>
             </form>

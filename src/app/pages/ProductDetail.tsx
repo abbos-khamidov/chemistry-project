@@ -24,7 +24,7 @@ import { productName } from '../lib/productLocale';
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { products, addProductInbound, updateProduct, deleteProduct, appendAudit, addDebt, recordClientSale } = useWarehouse();
+  const { products, debts, addProductInbound, updateProduct, deleteProduct, appendAudit, addDebt, recordClientSale } = useWarehouse();
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === 'director';
@@ -51,6 +51,7 @@ export default function ProductDetail() {
   const [dIssue, setDIssue] = useState('');
   const [dDue, setDDue] = useState('');
   const [dNotes, setDNotes] = useState('');
+  const [debtorPick, setDebtorPick] = useState('');
   const [sName, setSName] = useState('');
   const [sPhone, setSPhone] = useState('');
   const [sCompany, setSCompany] = useState('');
@@ -197,9 +198,30 @@ export default function ProductDetail() {
   const submitDebtFromProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
-    if (!dName.trim()) {
-      toast.error(t('products.toastDebtName'));
+    if (!debtorPick) {
+      toast.error(t('products.toastPickDebtor'));
       return;
+    }
+    let debtorName = '';
+    let debtorPhone = '';
+    let debtorCompany: string | undefined;
+    if (debtorPick === '__new__') {
+      if (!dName.trim()) {
+        toast.error(t('products.toastDebtName'));
+        return;
+      }
+      debtorName = dName.trim();
+      debtorPhone = dPhone.trim() || '—';
+      debtorCompany = dCompany.trim() || undefined;
+    } else {
+      const sel = debts.find((d) => d.id === debtorPick);
+      if (!sel) {
+        toast.error(t('products.toastPickDebtor'));
+        return;
+      }
+      debtorName = sel.fullName.trim();
+      debtorPhone = sel.phone.trim() || '—';
+      debtorCompany = sel.company?.trim() || undefined;
     }
     const qty = Number(dQty);
     if (!Number.isInteger(qty) || qty <= 0) {
@@ -216,9 +238,9 @@ export default function ProductDetail() {
       return;
     }
     const row: Omit<Debt, 'id'> = {
-      fullName: dName.trim(),
-      phone: dPhone.trim() || '—',
-      company: dCompany.trim() || undefined,
+      fullName: debtorName,
+      phone: debtorPhone,
+      company: debtorCompany,
       createdByRole: isDirector ? 'director' : 'worker',
       createdByUserId: user?.id,
       totalAmount: total,
@@ -249,11 +271,12 @@ export default function ProductDetail() {
       userRole: isDirector ? 'director' : 'worker',
       action: 'Создание',
       entity: 'Долг',
-      details: `${productName(product, locale)}, ${dName.trim()}, ${total.toLocaleString()} UZS`,
+      details: `${productName(product, locale)}, ${debtorName}, ${total.toLocaleString()} UZS`,
       ip: '—',
     });
     toast.success(t('products.toastDebtOk'));
     setDebtOpen(false);
+    setDebtorPick('');
     setDName('');
     setDPhone('');
     setDCompany('');
@@ -463,7 +486,13 @@ export default function ProductDetail() {
           <button
             type="button"
             disabled={product.quantity <= 0}
-            onClick={() => setDebtOpen(true)}
+            onClick={() => {
+              setDebtorPick('');
+              setDName('');
+              setDPhone('');
+              setDCompany('');
+              setDebtOpen(true);
+            }}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Wallet className="w-4 h-4" />
@@ -656,33 +685,81 @@ export default function ProductDetail() {
             </div>
             <form onSubmit={submitDebtFromProduct} className="space-y-3">
               <p className="text-sm text-slate-700 font-medium">{productName(product, locale)}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t('debts.debtorName')}</label>
-                  <input
-                    required
-                    value={dName}
-                    onChange={(e) => setDName(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
-                  <input
-                    value={dPhone}
-                    onChange={(e) => setDPhone(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                  />
-                </div>
-              </div>
               <div>
-                <label className="block text-sm text-slate-700 mb-1">{t('debts.company')}</label>
-                <input
-                  value={dCompany}
-                  onChange={(e) => setDCompany(e.target.value)}
+                <label className="block text-sm text-slate-700 mb-1">{t('products.debtorSelectLabel')}</label>
+                <select
+                  required
+                  value={debtorPick}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDebtorPick(v);
+                    if (v === '__new__') {
+                      setDName('');
+                      setDPhone('');
+                      setDCompany('');
+                    } else if (v) {
+                      const d = debts.find((x) => x.id === v);
+                      if (d) {
+                        setDName(d.fullName);
+                        setDPhone(d.phone);
+                        setDCompany(d.company ?? '');
+                      }
+                    } else {
+                      setDName('');
+                      setDPhone('');
+                      setDCompany('');
+                    }
+                  }}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                />
+                >
+                  <option value="">{t('products.debtorSelectPlaceholder')}</option>
+                  {debts.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.fullName} · {d.phone}
+                      {d.company ? ` · ${d.company}` : ''}
+                    </option>
+                  ))}
+                  <option value="__new__">{t('products.debtorNewContact')}</option>
+                </select>
               </div>
+              {debtorPick === '__new__' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t('debts.debtorName')}</label>
+                      <input
+                        required
+                        value={dName}
+                        onChange={(e) => setDName(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
+                      <input
+                        value={dPhone}
+                        onChange={(e) => setDPhone(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t('debts.company')}</label>
+                    <input
+                      value={dCompany}
+                      onChange={(e) => setDCompany(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </>
+              )}
+              {debtorPick && debtorPick !== '__new__' && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm">
+                  <p className="font-semibold text-slate-900">{dName}</p>
+                  <p className="text-slate-600">{dPhone}</p>
+                  {dCompany ? <p className="text-slate-600">{dCompany}</p> : null}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                 <div>
                   <label className="block text-sm text-slate-700 mb-1">{t('products.modalQty')}</label>

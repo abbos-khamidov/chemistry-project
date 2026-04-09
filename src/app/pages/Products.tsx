@@ -101,42 +101,28 @@ export default function Products() {
       return;
     }
 
-    if (!isDirector) {
-      addProduct({
-        name: name.trim(),
-        imageUrl: workerPhotoDataUrl || undefined,
-        category: "Без категории",
-        quantity: q,
-        unit: "шт",
-        price: pr,
-        supplier: "—",
-        expirationDate: new Date().toISOString().slice(0, 10),
-        createdBy: user?.fullName ?? "Сотрудник",
-      });
-    } else {
-      addProduct({
-        name: name.trim(),
-        imageUrl: workerPhotoDataUrl || undefined,
-        category: "Без категории",
-        categoryUz: undefined,
-        quantity: q,
-        unit: "шт",
-        price: pr,
-        supplier: supplier.trim() || "—",
-        expirationDate: expirationDate || new Date().toISOString().slice(0, 10),
-        notes: notes.trim() || undefined,
-        createdBy: user?.fullName ?? "Сотрудник",
-      });
-    }
+    addProduct({
+      name: name.trim(),
+      imageUrl: workerPhotoDataUrl || undefined,
+      category: "Без категории",
+      categoryUz: undefined,
+      quantity: q,
+      unit: "шт",
+      price: pr,
+      supplier: supplier.trim() || "—",
+      expirationDate: expirationDate || new Date().toISOString().slice(0, 10),
+      notes: notes.trim() || undefined,
+      createdBy: user?.fullName ?? "Директор",
+    });
     appendAudit({
       userName: user?.fullName ?? "—",
-      userRole: isDirector ? "director" : "worker",
+      userRole: "director",
       action: "Создание",
       entity: "Товар",
       details: name.trim(),
       ip: "—",
     });
-    toast.success(isDirector ? t("products.toastAddedDirector") : t("products.toastAddedWorker"));
+    toast.success(t("products.toastAddedDirector"));
     setModalOpen(false);
     resetForm();
   };
@@ -176,23 +162,25 @@ export default function Products() {
               </p>
             )}
           </div>
+          {isDirector && (
           <button
             type="button"
             onClick={() => setModalOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
             <Plus className="w-5 h-5" />
-            <span>{isDirector ? t("products.addDirector") : t("products.addWorker")}</span>
+            <span>{t("products.addDirector")}</span>
           </button>
+          )}
         </div>
       </div>
 
-      {modalOpen && (
+      {modalOpen && isDirector && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-slate-900">
-                {isDirector ? t("products.modalNewDirector") : t("products.modalNewWorker")}
+                {t("products.modalNewDirector")}
               </h2>
               <button type="button" onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
                 <X className="w-5 h-5" />
@@ -238,46 +226,7 @@ export default function Products() {
                   )}
                 </div>
               </div>
-              {!isDirector ? (
-                <>
-                  <div>
-                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelName")}</label>
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelQty")}</label>
-                      <input
-                        required
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelPriceUzs")}</label>
-                      <input
-                        required
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
+              <>
                   <div>
                     <label className="block text-sm text-slate-700 mb-1">{t("products.labelNameDirector")}</label>
                     <input
@@ -340,7 +289,6 @@ export default function Products() {
                     />
                   </div>
                 </>
-              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border rounded-lg">
                   {t("common.cancel")}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import {
@@ -14,12 +14,16 @@ import {
   Truck,
   Wallet,
   ShoppingBag,
+  ImageIcon,
 } from 'lucide-react';
 import type { Debt } from '../data/mockData';
+import type { UpdateProductInput } from '../context/WarehouseContext';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
+const MAX_IMAGE_BYTES = 600 * 1024;
+
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -41,6 +45,8 @@ export default function ProductDetail() {
   const [eExp, setEExp] = useState('');
   const [eNotes, setENotes] = useState('');
   const [eNameUz, setENameUz] = useState('');
+  const [editPhotoPending, setEditPhotoPending] = useState<'keep' | 'removed' | string>('keep');
+  const editPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const [debtOpen, setDebtOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
@@ -66,6 +72,8 @@ export default function ProductDetail() {
     setEExp(product.expirationDate);
     setENotes(product.notes ?? '');
     setENameUz(product.nameUz ?? '');
+    setEditPhotoPending('keep');
+    if (editPhotoInputRef.current) editPhotoInputRef.current.value = '';
   }, [product, editOpen]);
 
   if (!product) {
@@ -156,7 +164,7 @@ export default function ProductDetail() {
       toast.error(t('products.toastEditCheck'));
       return;
     }
-    updateProduct(id, {
+    const patch: UpdateProductInput = {
       name: eName.trim(),
       nameUz: eNameUz.trim() || undefined,
       quantity: q,
@@ -165,18 +173,51 @@ export default function ProductDetail() {
       supplier: eSupplier.trim() || '—',
       expirationDate: eExp || product.expirationDate,
       notes: eNotes.trim() || undefined,
-    });
+    };
+    if (editPhotoPending === 'removed') {
+      patch.imageUrl = undefined;
+    } else if (editPhotoPending !== 'keep' && typeof editPhotoPending === 'string') {
+      patch.imageUrl = editPhotoPending;
+    }
+    updateProduct(id, patch);
     appendAudit({
       userName: user?.fullName ?? 'Директор',
       userRole: 'director',
       action: 'Изменение',
       entity: 'Товар',
-      details: `Редактирование: ${eName.trim()}`,
+      details: `Редактирование: ${eName.trim()}${editPhotoPending !== 'keep' ? ', фото' : ''}`,
       ip: '—',
     });
     toast.success(t('products.toastSaved'));
     setEditOpen(false);
   };
+
+  const onEditPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('products.toastImage'));
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error(t('products.toastImageBig'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = reader.result;
+      if (typeof r === 'string') setEditPhotoPending(r);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const editPhotoPreview =
+    editPhotoPending === 'removed'
+      ? null
+      : editPhotoPending === 'keep'
+        ? product.imageUrl
+        : editPhotoPending;
+
 
   const handleDelete = () => {
     if (!isDirector || !id) return;
@@ -386,6 +427,46 @@ export default function ProductDetail() {
               </button>
             </div>
             <form onSubmit={submitEdit} className="space-y-3">
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('products.photoOptional')}</label>
+                <div className="rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg cursor-pointer hover:bg-white text-sm bg-white">
+                      <ImageIcon className="w-4 h-4 text-slate-600" />
+                      {t('products.chooseFile')}
+                      <input
+                        ref={editPhotoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={onEditPhoto}
+                      />
+                    </label>
+                    {(editPhotoPreview || product.imageUrl) && (
+                      <button
+                        type="button"
+                        className="text-sm text-red-600 hover:underline"
+                        onClick={() => {
+                          setEditPhotoPending('removed');
+                          if (editPhotoInputRef.current) editPhotoInputRef.current.value = '';
+                        }}
+                      >
+                        {t('products.removePhoto')}
+                      </button>
+                    )}
+                  </div>
+                  {editPhotoPreview ? (
+                    <div className="mt-3 w-32 h-32 rounded-lg border border-slate-200 overflow-hidden bg-white">
+                      <img src={editPhotoPreview} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="mt-3 w-32 h-32 rounded-lg border-2 border-dashed border-slate-300 bg-white flex items-center justify-center text-center px-2">
+                      <span className="text-xs text-slate-500">{t('products.photoPlaceholder')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm text-slate-700 mb-1">{t("products.labelName")}</label>
                 <input

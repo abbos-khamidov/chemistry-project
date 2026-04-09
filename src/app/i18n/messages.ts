@@ -154,7 +154,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     products: {
       pageTitle: 'Товары и склад',
       positionsCount: 'На складе {count} позиций',
-      workerHint: 'Рабочий добавляет товар (фото по желанию, название, количество, цена). Редактировать карточки может только директор.',
+      workerHint: 'Просмотр и операции с карточки товара (выдача в долг / оформление). Добавлять и менять товары, в том числе фото, может только директор.',
       addDirector: 'Добавить на склад',
       addWorker: 'Добавить товар',
       modalNewDirector: 'Новая позиция на складе',
@@ -545,7 +545,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     products: {
       pageTitle: 'Tovarlar va ombor',
       positionsCount: 'Omborda {count} pozitsiya',
-      workerHint: 'Ishchi tovar qo‘shadi (ixtiyoriy foto, nom, miqdor, narx). Kartochkalarni faqat direktor tahrirlaydi.',
+      workerHint: 'Ko‘rish va kartochkadan operatsiyalar. Tovar qo‘shish va tahrirlash (foto ham) — faqat direktor.',
       addDirector: "Omborga qo'shish",
       addWorker: "Tovar qo'shish",
       modalNewDirector: 'Yangi pozitsiya',

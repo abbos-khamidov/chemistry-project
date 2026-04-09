@@ -6,6 +6,7 @@ import Analytics from "./pages/Analytics";
 import Audit from "./pages/Audit";
 import WorkerKPI from "./pages/WorkerKPI";
 import Debts from "./pages/Debts";
+import Clients from "./pages/Clients";
 import DebtDetail from "./pages/DebtDetail";
 import Workers from "./pages/Workers";
 import Layout from "./components/Layout";
@@ -50,6 +51,14 @@ export const router = createBrowserRouter([
           <DirectorOnly>
             <WorkerKPI />
           </DirectorOnly>
+        ),
+      },
+      {
+        path: "clients",
+        element: (
+          <DirectorOrWorker>
+            <Clients />
+          </DirectorOrWorker>
         ),
       },
       {

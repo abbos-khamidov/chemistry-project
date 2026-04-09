@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, WorkerKPI } from '../data/mockData';
+import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, WorkerKPI, ClientSale } from '../data/mockData';
 import { deriveProductStatus } from '../lib/warehouseUtils';
 
 const STORAGE_KEY = 'warehouse-app-data-v2';
@@ -16,6 +16,7 @@ const STORAGE_KEY = 'warehouse-app-data-v2';
 export type WarehousePersisted = {
   products: Product[];
   debts: Debt[];
+  clientSales: ClientSale[];
   workerKpis: WorkerKPI[];
   auditLog: AuditLogEntry[];
   /** id записей аудита, отмеченных как прочитанные в уведомлениях */
@@ -25,6 +26,7 @@ export type WarehousePersisted = {
 const empty = (): WarehousePersisted => ({
   products: [],
   debts: [],
+  clientSales: [],
   workerKpis: [],
   auditLog: [],
   readAuditIds: [],
@@ -48,6 +50,7 @@ function load(): WarehousePersisted {
     return {
       products: Array.isArray(p.products) ? p.products : [],
       debts: Array.isArray(p.debts) ? p.debts.map((x) => normalizeDebt(x as Debt)) : [],
+      clientSales: Array.isArray(p.clientSales) ? (p.clientSales as ClientSale[]) : [],
       workerKpis: Array.isArray(p.workerKpis) ? p.workerKpis : [],
       auditLog: Array.isArray(p.auditLog) ? p.auditLog : [],
       readAuditIds: Array.isArray(p.readAuditIds) ? p.readAuditIds : [],
@@ -107,6 +110,16 @@ export type DebtPaymentInput = {
   productName: string;
 };
 
+export type RecordClientSaleInput = {
+  productId: string;
+  quantity: number;
+  fullName: string;
+  phone?: string;
+  company?: string;
+  createdByUserId?: string;
+  createdByRole: 'director' | 'worker';
+};
+
 type WarehouseContextValue = WarehousePersisted & {
   addProduct: (input: AddProductInput) => Product;
   updateProduct: (productId: string, input: UpdateProductInput) => boolean;
@@ -114,6 +127,7 @@ type WarehouseContextValue = WarehousePersisted & {
   addProductInbound: (productId: string, quantity: number, userName: string) => boolean;
   addDebt: (debt: Omit<Debt, 'id'>) => { ok: true; debt: Debt } | { ok: false; error: string };
   applyDebtPayment: (debtId: string, input: DebtPaymentInput) => { ok: true } | { ok: false; error: string };
+  recordClientSale: (input: RecordClientSaleInput) => { ok: true } | { ok: false; error: string };
   appendAudit: (entry: Omit<AuditLogEntry, 'id' | 'at'>) => void;
   markAuditRead: (auditId: string) => void;
 };
@@ -367,6 +381,58 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     [commit]
   );
 
+  const recordClientSale = useCallback(
+    (input: RecordClientSaleInput): { ok: true } | { ok: false; error: string } => {
+      const qty = Number(input.quantity);
+      if (!Number.isInteger(qty) || qty <= 0) {
+        return { ok: false, error: 'Количество должно быть целым числом больше 0' };
+      }
+      const prev = dataRef.current;
+      const p = prev.products.find((x) => x.id === input.productId);
+      if (!p) return { ok: false, error: 'Товар не найден' };
+      if (qty > p.quantity) {
+        return { ok: false, error: `Недостаточно товара на складе: ${p.name}` };
+      }
+      const amountUzs = qty * p.price;
+      const today = new Date().toISOString().slice(0, 10);
+      const sale: ClientSale = {
+        id: uid(),
+        fullName: input.fullName.trim(),
+        phone: (input.phone ?? '').trim() || '—',
+        company: input.company?.trim() || undefined,
+        productId: p.id,
+        productName: p.name,
+        quantity: qty,
+        amountUzs,
+        date: today,
+        createdByUserId: input.createdByUserId,
+        createdByRole: input.createdByRole,
+      };
+      const nextQty = p.quantity - qty;
+      const updated: Product = {
+        ...p,
+        quantity: nextQty,
+        status: deriveProductStatus(nextQty),
+        history: [
+          {
+            date: today,
+            action: 'Removed',
+            quantity: -qty,
+            user: input.fullName.trim() || '—',
+          },
+          ...p.history,
+        ],
+      };
+      commit({
+        ...prev,
+        products: prev.products.map((x) => (x.id === input.productId ? updated : x)),
+        clientSales: [sale, ...(prev.clientSales ?? [])],
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
   const markAuditRead = useCallback(
     (auditId: string) => {
       const prev = dataRef.current;
@@ -385,10 +451,11 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       addProductInbound,
       addDebt,
       applyDebtPayment,
+      recordClientSale,
       appendAudit,
       markAuditRead,
     }),
-    [data, addProduct, updateProduct, deleteProduct, addProductInbound, addDebt, applyDebtPayment, appendAudit, markAuditRead]
+    [data, addProduct, updateProduct, deleteProduct, addProductInbound, addDebt, applyDebtPayment, recordClientSale, appendAudit, markAuditRead]
   );
 
   return <WarehouseContext.Provider value={value}>{children}</WarehouseContext.Provider>;

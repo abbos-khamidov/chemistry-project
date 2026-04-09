@@ -12,7 +12,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
-import { LineChart, Line, BarChart as RechartsBar, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardStats, recentActivity } from '../data/mockData';
 
 const monthlyData = [
@@ -21,11 +21,6 @@ const monthlyData = [
   { name: 'Mar', value: 15850000, operations: 24 },
 ];
 
-const categoryData = [
-  { name: 'Chemicals', value: 9200000 },
-  { name: 'Safety', value: 4100000 },
-  { name: 'Equipment', value: 2550000 },
-];
 
 export default function Dashboard() {
   return (
@@ -134,7 +129,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="mb-6">
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Динамика стоимости склада</h3>
           <ResponsiveContainer width="100%" height={250}>
@@ -145,19 +140,6 @@ export default function Dashboard() {
               <Tooltip />
               <Line type="monotone" dataKey="value" stroke="#475569" strokeWidth={2} />
             </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200/80 p-6">
-          <h3 className="font-semibold text-slate-900 mb-4">По категориям</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <RechartsBar data={categoryData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#475569" radius={[8, 8, 0, 0]} />
-            </RechartsBar>
           </ResponsiveContainer>
         </div>
       </div>

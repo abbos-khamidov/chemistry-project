@@ -16,7 +16,7 @@ import {
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
-import { productName, productCategory } from '../lib/productLocale';
+import { productName } from '../lib/productLocale';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -32,28 +32,22 @@ export default function ProductDetail() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [eName, setEName] = useState('');
-  const [eCategory, setECategory] = useState('');
   const [eQty, setEQty] = useState('');
-  const [eUnit, setEUnit] = useState('');
   const [ePrice, setEPrice] = useState('');
   const [eSupplier, setESupplier] = useState('');
   const [eExp, setEExp] = useState('');
   const [eNotes, setENotes] = useState('');
   const [eNameUz, setENameUz] = useState('');
-  const [eCategoryUz, setECategoryUz] = useState('');
 
   useEffect(() => {
     if (!product || !editOpen) return;
     setEName(product.name);
-    setECategory(product.category);
     setEQty(String(product.quantity));
-    setEUnit(product.unit);
     setEPrice(String(product.price));
     setESupplier(product.supplier);
     setEExp(product.expirationDate);
     setENotes(product.notes ?? '');
     setENameUz(product.nameUz ?? '');
-    setECategoryUz(product.categoryUz ?? '');
   }, [product, editOpen]);
 
   if (!product) {
@@ -147,10 +141,8 @@ export default function ProductDetail() {
     updateProduct(id, {
       name: eName.trim(),
       nameUz: eNameUz.trim() || undefined,
-      category: eCategory || 'Прочее',
-      categoryUz: eCategoryUz.trim() || undefined,
       quantity: q,
-      unit: eUnit.trim() || 'шт',
+      unit: 'шт',
       price: pr,
       supplier: eSupplier.trim() || '—',
       expirationDate: eExp || product.expirationDate,
@@ -206,7 +198,6 @@ export default function ProductDetail() {
           <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{productName(product, locale)}</h1>
-              <p className="text-slate-600 mt-1">{productCategory(product, locale)}</p>
               {!isDirector && (
                 <p className="text-sm text-slate-500 mt-2 max-w-md">
 {t("products.detailViewOnly")}
@@ -263,20 +254,6 @@ export default function ProductDetail() {
                   onChange={(e) => setENameUz(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t("products.labelCategory")}</label>
-                  <input value={eCategory} onChange={(e) => setECategory(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t("common.categoryUz")}</label>
-                  <input value={eCategoryUz} onChange={(e) => setECategoryUz(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-700 mb-1">{t("products.labelUnit")}</label>
-                <input value={eUnit} onChange={(e) => setEUnit(e.target.value)} className="w-full border rounded-lg px-3 py-2 max-w-md" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -422,18 +399,10 @@ export default function ProductDetail() {
               <p className="font-medium text-slate-900">{productName(product, locale)}</p>
             </div>
             <div>
-              <label className="text-sm text-slate-600 block mb-1">{t("products.labelCategory")}</label>
-              <p className="font-medium text-slate-900">{productCategory(product, locale)}</p>
-            </div>
-            <div>
               <label className="text-sm text-slate-600 block mb-1">{t("products.labelQty")}</label>
               <p className="font-medium text-slate-900">
-                {product.quantity} {product.unit}
+                {product.quantity}
               </p>
-            </div>
-            <div>
-              <label className="text-sm text-slate-600 block mb-1">{t("products.labelUnit")}</label>
-              <p className="font-medium text-slate-900">{product.unit}</p>
             </div>
             <div>
               <label className="text-sm text-slate-600 block mb-1">{t("products.labelPriceUnit")}</label>
@@ -477,7 +446,6 @@ export default function ProductDetail() {
                 <p className="text-xl font-bold text-slate-900">{product.quantity}</p>
               </div>
             </div>
-            <p className="text-xs text-slate-600">{product.unit}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200/80 p-6">
@@ -537,7 +505,7 @@ export default function ProductDetail() {
                       {t("products.historyQty")}:{' '}
                       <span className={entry.quantity > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
                         {entry.quantity > 0 ? '+' : ''}
-                        {entry.quantity} {product.unit}
+                        {entry.quantity}
                       </span>
                     </p>
                   </div>

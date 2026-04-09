@@ -162,8 +162,6 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Валюта</label>
                 <select className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800">
                   <option>UZS — узбекский сум</option>
-                  <option>USD — доллар США</option>
-                  <option>EUR — евро</option>
                 </select>
               </div>
             </div>

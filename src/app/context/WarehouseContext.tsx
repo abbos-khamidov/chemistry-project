@@ -112,7 +112,7 @@ type WarehouseContextValue = WarehousePersisted & {
   updateProduct: (productId: string, input: UpdateProductInput) => boolean;
   deleteProduct: (productId: string) => boolean;
   addProductInbound: (productId: string, quantity: number, userName: string) => boolean;
-  addDebt: (debt: Omit<Debt, 'id'>) => Debt;
+  addDebt: (debt: Omit<Debt, 'id'>) => { ok: true; debt: Debt } | { ok: false; error: string };
   applyDebtPayment: (debtId: string, input: DebtPaymentInput) => { ok: true } | { ok: false; error: string };
   appendAudit: (entry: Omit<AuditLogEntry, 'id' | 'at'>) => void;
   markAuditRead: (auditId: string) => void;
@@ -255,16 +255,61 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
   );
 
   const addDebt = useCallback(
-    (input: Omit<Debt, 'id'>): Debt => {
+    (input: Omit<Debt, 'id'>): { ok: true; debt: Debt } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      const stockByProductId = new Map(prev.products.map((product) => [product.id, product]));
+      const requestedByProductId = new Map<string, number>();
+
+      for (const row of input.products) {
+        const qty = Number(row.quantity);
+        if (!Number.isInteger(qty) || qty <= 0) {
+          return { ok: false, error: 'Количество товара должно быть целым числом больше 0' };
+        }
+        const product = stockByProductId.get(row.productId);
+        if (!product) {
+          return { ok: false, error: `Товар не найден: ${row.productName}` };
+        }
+        requestedByProductId.set(row.productId, (requestedByProductId.get(row.productId) ?? 0) + qty);
+      }
+
+      for (const [productId, requestedQty] of requestedByProductId) {
+        const product = stockByProductId.get(productId);
+        if (!product) continue;
+        if (requestedQty > product.quantity) {
+          return { ok: false, error: `Недостаточно товара на складе: ${product.name}` };
+        }
+      }
+
       const debt: Debt = {
         ...input,
         debtHistory: input.debtHistory ?? [],
         paymentHistory: input.paymentHistory ?? [],
         id: uid(),
       };
-      const prev = dataRef.current;
-      commit({ ...prev, debts: [...prev.debts, debt] });
-      return debt;
+
+      const today = new Date().toISOString().slice(0, 10);
+      const updatedProducts = prev.products.map((product) => {
+        const requestedQty = requestedByProductId.get(product.id);
+        if (!requestedQty) return product;
+        const nextQty = product.quantity - requestedQty;
+        return {
+          ...product,
+          quantity: nextQty,
+          status: deriveProductStatus(nextQty),
+          history: [
+            {
+              date: today,
+              action: 'Removed',
+              quantity: -requestedQty,
+              user: input.fullName.trim() || '—',
+            },
+            ...product.history,
+          ],
+        };
+      });
+
+      commit({ ...prev, products: updatedProducts, debts: [...prev.debts, debt] });
+      return { ok: true, debt };
     },
     [commit]
   );

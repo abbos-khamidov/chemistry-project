@@ -11,6 +11,7 @@ import {
   Target,
   Wallet,
   Users,
+  UserCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
@@ -34,12 +35,14 @@ export default function Layout() {
         { nameKey: 'layout.navAudit', href: '/audit', icon: FileSearch },
         { nameKey: 'layout.navWorkerKpi', href: '/worker-kpi', icon: Target },
         { nameKey: 'layout.navProducts', href: '/products', icon: Package },
+        { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
         { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
         { nameKey: 'layout.navWorkers', href: '/workers', icon: Users },
       ];
     }
     return [
       { nameKey: 'layout.navProducts', href: '/products', icon: Package },
+      { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
       { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
     ];
   }, [currentUser.role]);
@@ -52,6 +55,7 @@ export default function Layout() {
 
   const isActive = (href: string) => {
     if (href === '/products') return location.pathname.startsWith('/products');
+    if (href === '/clients') return location.pathname.startsWith('/clients');
     if (href === '/debts') return location.pathname.startsWith('/debts');
     return location.pathname === href;
   };
@@ -60,15 +64,17 @@ export default function Layout() {
     currentUser.role === 'director' ? t('layout.searchDirector') : t('layout.searchWorker');
 
   const mobileCols =
-    navigation.length >= 6
-      ? 'grid-cols-6'
-      : navigation.length >= 5
-        ? 'grid-cols-5'
-        : navigation.length >= 3
-          ? 'grid-cols-3'
-          : navigation.length >= 2
-            ? 'grid-cols-2'
-            : 'grid-cols-1';
+    navigation.length >= 7
+      ? 'grid-cols-7'
+      : navigation.length >= 6
+        ? 'grid-cols-6'
+        : navigation.length >= 5
+          ? 'grid-cols-5'
+          : navigation.length >= 3
+            ? 'grid-cols-3'
+            : navigation.length >= 2
+              ? 'grid-cols-2'
+              : 'grid-cols-1';
 
   return (
     <div className="min-h-screen bg-slate-50/80">

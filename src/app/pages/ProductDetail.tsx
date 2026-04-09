@@ -12,7 +12,10 @@ import {
   Building,
   X,
   Truck,
+  Wallet,
+  ShoppingBag,
 } from 'lucide-react';
+import type { Debt } from '../data/mockData';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
@@ -21,7 +24,7 @@ import { productName } from '../lib/productLocale';
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { products, addProductInbound, updateProduct, deleteProduct, appendAudit } = useWarehouse();
+  const { products, addProductInbound, updateProduct, deleteProduct, appendAudit, addDebt, recordClientSale } = useWarehouse();
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === 'director';
@@ -38,6 +41,20 @@ export default function ProductDetail() {
   const [eExp, setEExp] = useState('');
   const [eNotes, setENotes] = useState('');
   const [eNameUz, setENameUz] = useState('');
+
+  const [debtOpen, setDebtOpen] = useState(false);
+  const [saleOpen, setSaleOpen] = useState(false);
+  const [dName, setDName] = useState('');
+  const [dPhone, setDPhone] = useState('');
+  const [dCompany, setDCompany] = useState('');
+  const [dQty, setDQty] = useState('1');
+  const [dIssue, setDIssue] = useState('');
+  const [dDue, setDDue] = useState('');
+  const [dNotes, setDNotes] = useState('');
+  const [sName, setSName] = useState('');
+  const [sPhone, setSPhone] = useState('');
+  const [sCompany, setSCompany] = useState('');
+  const [sQty, setSQty] = useState('1');
 
   useEffect(() => {
     if (!product || !editOpen) return;
@@ -174,6 +191,114 @@ export default function ProductDetail() {
     });
     toast.success(t('products.toastDeleted'));
     navigate('/products', { replace: true });
+  };
+
+
+  const submitDebtFromProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    if (!dName.trim()) {
+      toast.error(t('products.toastDebtName'));
+      return;
+    }
+    const qty = Number(dQty);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      toast.error(t('debts.toastQtyInteger'));
+      return;
+    }
+    if (qty > product.quantity) {
+      toast.error(t('debts.toastStockExceeded').replace('{name}', productName(product, locale)));
+      return;
+    }
+    const total = qty * product.price;
+    if (total <= 0) {
+      toast.error(t('debts.toastSum'));
+      return;
+    }
+    const row: Omit<Debt, 'id'> = {
+      fullName: dName.trim(),
+      phone: dPhone.trim() || '—',
+      company: dCompany.trim() || undefined,
+      createdByRole: isDirector ? 'director' : 'worker',
+      createdByUserId: user?.id,
+      totalAmount: total,
+      paidAmount: 0,
+      remainingAmount: total,
+      issueDate: dIssue || new Date().toISOString().slice(0, 10),
+      dueDate: dDue || new Date().toISOString().slice(0, 10),
+      status: 'active',
+      products: [
+        {
+          productId: product.id,
+          productName: product.name,
+          quantity: qty,
+          price: product.price,
+        },
+      ],
+      debtHistory: [],
+      paymentHistory: [],
+      notes: dNotes.trim() || undefined,
+    };
+    const result = addDebt(row);
+    if (!result.ok) {
+      toast.error(result.error || t('debts.toastStockFailed'));
+      return;
+    }
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: isDirector ? 'director' : 'worker',
+      action: 'Создание',
+      entity: 'Долг',
+      details: `${productName(product, locale)}, ${dName.trim()}, ${total.toLocaleString()} UZS`,
+      ip: '—',
+    });
+    toast.success(t('products.toastDebtOk'));
+    setDebtOpen(false);
+    setDName('');
+    setDPhone('');
+    setDCompany('');
+    setDQty('1');
+    setDIssue('');
+    setDDue('');
+    setDNotes('');
+  };
+
+  const submitSaleFromProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    if (!sName.trim()) {
+      toast.error(t('products.toastSaleName'));
+      return;
+    }
+    const qty = Number(sQty);
+    const result = recordClientSale({
+      productId: product.id,
+      quantity: qty,
+      fullName: sName.trim(),
+      phone: sPhone.trim() || undefined,
+      company: sCompany.trim() || undefined,
+      createdByUserId: user?.id,
+      createdByRole: isDirector ? 'director' : 'worker',
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    const amount = qty * product.price;
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: isDirector ? 'director' : 'worker',
+      action: 'Создание',
+      entity: 'Продажа',
+      details: `${productName(product, locale)}, ${sName.trim()}, ${amount.toLocaleString()} UZS`,
+      ip: '—',
+    });
+    toast.success(t('products.toastSaleOk'));
+    setSaleOpen(false);
+    setSName('');
+    setSPhone('');
+    setSCompany('');
+    setSQty('1');
   };
 
   const r = product.shipmentRecipient;
@@ -330,6 +455,32 @@ export default function ProductDetail() {
           </dl>
         </div>
       )}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6">
+        <h2 className="font-semibold text-slate-900 mb-2">{t('products.issueBlockTitle')}</h2>
+        <p className="text-sm text-slate-600 mb-1">{t('products.issueHintDebt')}</p>
+        <p className="text-sm text-slate-600 mb-4">{t('products.issueHintSale')}</p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            disabled={product.quantity <= 0}
+            onClick={() => setDebtOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Wallet className="w-4 h-4" />
+            {t('products.issueDebt')}
+          </button>
+          <button
+            type="button"
+            disabled={product.quantity <= 0}
+            onClick={() => setSaleOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            {t('products.issueSale')}
+          </button>
+        </div>
+      </div>
+
 
       {isDirector && (
         <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6">
@@ -455,8 +606,8 @@ export default function ProductDetail() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">{t("products.valueCard")}</p>
-                <p className="text-xl font-bold text-slate-900">
-                  {((product.price * product.quantity) / 1000000).toFixed(2)}M
+                <p className="text-xl font-bold text-slate-900 tabular-nums">
+                  {(product.price * product.quantity).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -488,6 +639,198 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+
+      {debtOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">{t('products.modalDebtTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => setDebtOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitDebtFromProduct} className="space-y-3">
+              <p className="text-sm text-slate-700 font-medium">{productName(product, locale)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debts.debtorName')}</label>
+                  <input
+                    required
+                    value={dName}
+                    onChange={(e) => setDName(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
+                  <input
+                    value={dPhone}
+                    onChange={(e) => setDPhone(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debts.company')}</label>
+                <input
+                  value={dCompany}
+                  onChange={(e) => setDCompany(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('products.modalQty')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={dQty}
+                    onChange={(e) => setDQty(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div className="text-sm text-slate-600 pb-2">
+                  {t('products.modalStock')}: <span className="font-medium text-slate-900">{product.quantity}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
+                <span className="text-sm text-slate-600">{t('products.modalTotal')}</span>
+                <span className="text-lg font-semibold text-slate-900">
+                  {(Number(dQty) > 0 && Number.isInteger(Number(dQty))
+                    ? Number(dQty) * product.price
+                    : 0
+                  ).toLocaleString()}{' '}
+                  UZS
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debts.issueDate')}</label>
+                  <input
+                    type="date"
+                    value={dIssue}
+                    onChange={(e) => setDIssue(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debts.dueDate')}</label>
+                  <input
+                    type="date"
+                    value={dDue}
+                    onChange={(e) => setDDue(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('products.modalNotes')}</label>
+                <textarea
+                  value={dNotes}
+                  onChange={(e) => setDNotes(e.target.value)}
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setDebtOpen(false)} className="px-4 py-2 border rounded-lg">
+                  {t('common.cancel')}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  {t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {saleOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">{t('products.modalSaleTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => setSaleOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitSaleFromProduct} className="space-y-3">
+              <p className="text-sm text-slate-700 font-medium">{productName(product, locale)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-slate-700 mb-1">{t('products.modalClientName')}</label>
+                  <input
+                    required
+                    value={sName}
+                    onChange={(e) => setSName(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
+                  <input
+                    value={sPhone}
+                    onChange={(e) => setSPhone(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debts.company')}</label>
+                  <input
+                    value={sCompany}
+                    onChange={(e) => setSCompany(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('products.modalQty')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={sQty}
+                    onChange={(e) => setSQty(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div className="text-sm text-slate-600 pb-2">
+                  {t('products.modalStock')}: <span className="font-medium text-slate-900">{product.quantity}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
+                <span className="text-sm text-slate-600">{t('products.modalTotal')}</span>
+                <span className="text-lg font-semibold text-slate-900">
+                  {(Number(sQty) > 0 && Number.isInteger(Number(sQty))
+                    ? Number(sQty) * product.price
+                    : 0
+                  ).toLocaleString()}{' '}
+                  UZS
+                </span>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setSaleOpen(false)} className="px-4 py-2 border rounded-lg">
+                  {t('common.cancel')}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  {t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200/80 p-6">
         <h2 className="font-semibold text-slate-900 mb-4">{t("products.movementTitle")}</h2>

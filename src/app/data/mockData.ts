@@ -49,6 +49,21 @@ export interface DebtHistoryEntry {
   paidPercentOfTotal: number;
 }
 
+/** Оформление продажи клиенту (полная оплата, не долг) — учёт на вкладке «Клиенты». */
+export interface ClientSale {
+  id: string;
+  fullName: string;
+  phone: string;
+  company?: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  amountUzs: number;
+  date: string;
+  createdByUserId?: string;
+  createdByRole?: 'director' | 'worker';
+}
+
 export interface Debt {
   id: string;
   fullName: string;

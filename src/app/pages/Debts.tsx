@@ -58,7 +58,7 @@ export default function Debts() {
       if (!line.productId) continue;
       const p = products.find((x) => x.id === line.productId);
       const q = Number(line.quantity);
-      if (!p || !Number.isFinite(q) || q <= 0) continue;
+      if (!p || !Number.isInteger(q) || q <= 0) continue;
       sum += q * p.price;
     }
     return sum;
@@ -119,7 +119,15 @@ export default function Debts() {
       if (!line.productId) continue;
       const p = products.find((x) => x.id === line.productId);
       const q = Number(line.quantity);
-      if (!p || !Number.isFinite(q) || q <= 0) continue;
+      if (!p) continue;
+      if (!Number.isInteger(q) || q <= 0) {
+        toast.error(t('debts.toastQtyInteger'));
+        return;
+      }
+      if (q > p.quantity) {
+        toast.error(t('debts.toastStockExceeded').replace('{name}', productName(p, locale)));
+        return;
+      }
       productRows.push({
         productId: p.id,
         productName: p.name,
@@ -154,7 +162,11 @@ export default function Debts() {
       paymentHistory: [],
       notes: notes.trim() || undefined,
     };
-    addDebt(row);
+    const result = addDebt(row);
+    if (!result.ok) {
+      toast.error(result.error || t('debts.toastStockFailed'));
+      return;
+    }
     appendAudit({
       userName: user?.fullName ?? '—',
       userRole: isDirector ? 'director' : 'worker',
@@ -194,7 +206,7 @@ export default function Debts() {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
             <Plus className="w-5 h-5" />
-            <span>{t("debts.addDebt")}</span>
+            <span>{t("debts.issueProduct")}</span>
           </button>
         </div>
       </div>
@@ -203,7 +215,7 @@ export default function Debts() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl border max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">{t("debts.modalTitle")}</h2>
+              <h2 className="text-lg font-semibold">{t("debts.modalIssueTitle")}</h2>
               <button
                 type="button"
                 onClick={() => {
@@ -276,7 +288,7 @@ export default function Debts() {
                         <option value="">{t("debts.selectProduct")}</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {productName(p, locale)} — {p.price.toLocaleString()} UZS / {p.unit}
+                            {productName(p, locale)} — {p.price.toLocaleString()} UZS / {p.unit} ({t("debts.stockLeft")}: {p.quantity} {p.unit})
                           </option>
                         ))}
                       </select>
@@ -285,8 +297,8 @@ export default function Debts() {
                       <label className="block text-xs text-slate-600 mb-1">{t("debts.quantity")}</label>
                       <input
                         type="number"
-                        min={0.001}
-                        step="any"
+                        min={1}
+                        step={1}
                         value={line.quantity}
                         onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
                         className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
@@ -389,7 +401,7 @@ export default function Debts() {
             </div>
             <div>
               <p className="text-sm text-slate-600">{t("debts.statTotal")}</p>
-              <p className="text-2xl font-bold text-slate-900">{(totalDebts / 1000000).toFixed(1)}M</p>
+              <p className="text-2xl font-bold text-slate-900">{totalDebts.toLocaleString()}</p>
             </div>
           </div>
           <p className="text-xs text-slate-600 mt-1">UZS</p>

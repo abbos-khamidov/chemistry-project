@@ -3,7 +3,6 @@ import * as XLSX from 'xlsx';
 const SHEET = {
   summary: 'Summary',
   monthly: 'Monthly',
-  categories: 'Categories',
   debts: 'Debts',
   top: 'Top products',
 } as const;
@@ -21,7 +20,6 @@ export type AnalyticsExportInput = {
   };
   monthlyInventoryData: Array<{ month: string; value: number; operations: number }>;
   debtAnalytics: Array<{ month: string; paid: number; unpaid: number }>;
-  categoryDistribution: Array<{ name: string; value: number; percentage: number }>;
   topProducts: Array<{ name: string; quantity: number; value: number }>;
   totalWarehouseValue: number;
 };
@@ -39,7 +37,6 @@ export function exportAnalyticsToXlsx(input: AnalyticsExportInput): void {
     stats,
     monthlyInventoryData,
     debtAnalytics,
-    categoryDistribution,
     topProducts,
     totalWarehouseValue,
   } = input;
@@ -61,10 +58,6 @@ export function exportAnalyticsToXlsx(input: AnalyticsExportInput): void {
   const invHeader = [t('analytics.exportColMonth'), t('analytics.lineTurnover'), t('analytics.tooltipOps')];
   const invBody = monthlyInventoryData.map((row) => [row.month, row.value, row.operations]);
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([invHeader, ...invBody]), safeSheetName(SHEET.monthly));
-
-  const catHeader = [t('analytics.exportColCategory'), t('analytics.tooltipValue'), '%'];
-  const catBody = categoryDistribution.map((row) => [row.name, row.value, row.percentage]);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([catHeader, ...catBody]), safeSheetName(SHEET.categories));
 
   const debtHeader = [t('analytics.exportColMonth'), t('analytics.barPaid'), t('analytics.barUnpaid')];
   const debtBody = debtAnalytics.map((row) => [row.month, row.paid, row.unpaid]);

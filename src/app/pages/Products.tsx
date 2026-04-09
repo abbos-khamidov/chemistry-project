@@ -5,7 +5,7 @@ import { Plus, Search, Filter, Grid, List, AlertCircle, Package, ChevronRight, X
 import { useWarehouse } from "../context/WarehouseContext";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
-import { productName, productCategory } from "../lib/productLocale";
+import { productName } from "../lib/productLocale";
 
 const MAX_IMAGE_BYTES = 600 * 1024;
 
@@ -17,30 +17,24 @@ export default function Products() {
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
 
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("Chemicals");
   const [quantity, setQuantity] = useState("");
-  const [unit, setUnit] = useState("L");
   const [price, setPrice] = useState("");
   const [supplier, setSupplier] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [nameUz, setNameUz] = useState("");
-  const [categoryUz, setCategoryUz] = useState("");
   const [workerPhotoDataUrl, setWorkerPhotoDataUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredProducts = products.filter((product) => {
     const q = searchQuery.toLowerCase();
-    const blob = [product.name, product.nameUz ?? "", product.category, product.categoryUz ?? ""].join(" ").toLowerCase();
+    const blob = [product.name, product.nameUz ?? ""].join(" ").toLowerCase();
     const matchesSearch = !q.trim() || blob.includes(q);
-    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
     const matchesStatus = statusFilter === "all" || product.status === statusFilter;
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   const getStatusColor = (status: string) => {
@@ -69,12 +63,8 @@ export default function Products() {
     }
   };
 
-  const categories = Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
-
   const resetForm = () => {
     setName("");
-    setNameUz("");
-    setCategoryUz("");
     setQuantity("");
     setPrice("");
     setSupplier("");
@@ -115,7 +105,7 @@ export default function Products() {
       addProduct({
         name: name.trim(),
         imageUrl: workerPhotoDataUrl || undefined,
-        category: "Прочее",
+        category: "Без категории",
         quantity: q,
         unit: "шт",
         price: pr,
@@ -126,11 +116,11 @@ export default function Products() {
     } else {
       addProduct({
         name: name.trim(),
-        nameUz: nameUz.trim() || undefined,
-        category: category || "Прочее",
-        categoryUz: categoryUz.trim() || undefined,
+        imageUrl: workerPhotoDataUrl || undefined,
+        category: "Без категории",
+        categoryUz: undefined,
         quantity: q,
-        unit: unit.trim() || "шт",
+        unit: "шт",
         price: pr,
         supplier: supplier.trim() || "—",
         expirationDate: expirationDate || new Date().toISOString().slice(0, 10),
@@ -154,8 +144,8 @@ export default function Products() {
   const productThumb = (imageUrl: string | undefined, size: "grid" | "table") => {
     const cls =
       size === "grid"
-        ? "w-full max-w-[300px] aspect-square mx-auto mb-4 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
-        : "w-[80px] h-[80px] bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden";
+        ? "w-full max-w-[300px] aspect-square mx-auto mb-4 bg-slate-50 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
+        : "w-[80px] h-[80px] bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden";
     if (imageUrl) {
       return (
         <div className={cls}>
@@ -164,8 +154,11 @@ export default function Products() {
       );
     }
     return (
-      <div className={cls}>
-        <Package className={size === "grid" ? "w-16 h-16 text-slate-400" : "w-8 h-8 text-slate-400"} />
+      <div className={`${cls} border-2 border-dashed border-slate-300`}>
+        <div className="text-center px-2">
+          <Package className={size === "grid" ? "w-16 h-16 text-slate-400 mx-auto" : "w-8 h-8 text-slate-400 mx-auto"} />
+          {size === "grid" && <p className="text-xs text-slate-500 mt-2">{t("products.photoPlaceholder")}</p>}
+        </div>
       </div>
     );
   };
@@ -206,41 +199,47 @@ export default function Products() {
               </button>
             </div>
             <form onSubmit={submitProduct} className="space-y-3">
-              {!isDirector ? (
-                <>
-                  <div>
-                    <label className="block text-sm text-slate-700 mb-1">{t("products.photoOptional")}</label>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 text-sm">
-                        <ImageIcon className="w-4 h-4 text-slate-600" />
-                        {t("products.chooseFile")}
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={onWorkerPhoto}
-                        />
-                      </label>
-                      {workerPhotoDataUrl && (
-                        <button
-                          type="button"
-                          className="text-sm text-red-600 hover:underline"
-                          onClick={() => {
-                            setWorkerPhotoDataUrl(null);
-                            if (fileInputRef.current) fileInputRef.current.value = "";
-                          }}
-                        >
-                          {t("products.removePhoto")}
-                        </button>
-                      )}
-                    </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t("products.photoOptional")}</label>
+                <div className="rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg cursor-pointer hover:bg-white text-sm bg-white">
+                      <ImageIcon className="w-4 h-4 text-slate-600" />
+                      {t("products.chooseFile")}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={onWorkerPhoto}
+                      />
+                    </label>
                     {workerPhotoDataUrl && (
-                      <div className="mt-2 w-32 h-32 rounded-lg border border-slate-200 overflow-hidden">
-                        <img src={workerPhotoDataUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
+                      <button
+                        type="button"
+                        className="text-sm text-red-600 hover:underline"
+                        onClick={() => {
+                          setWorkerPhotoDataUrl(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                      >
+                        {t("products.removePhoto")}
+                      </button>
                     )}
                   </div>
+                  {workerPhotoDataUrl ? (
+                    <div className="mt-3 w-32 h-32 rounded-lg border border-slate-200 overflow-hidden bg-white">
+                      <img src={workerPhotoDataUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="mt-3 w-32 h-32 rounded-lg border-2 border-dashed border-slate-300 bg-white flex items-center justify-center text-center px-2">
+                      <span className="text-xs text-slate-500">{t("products.photoPlaceholder")}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {!isDirector ? (
+                <>
                   <div>
                     <label className="block text-sm text-slate-700 mb-1">{t("products.labelName")}</label>
                     <input
@@ -286,42 +285,6 @@ export default function Products() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-700 mb-1">{t("common.nameUz")}</label>
-                    <input
-                      value={nameUz}
-                      onChange={(e) => setNameUz(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                      placeholder={locale === "uz" ? "" : "ixtiyoriy"}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelCategory")}</label>
-                      <input
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t("common.categoryUz")}</label>
-                      <input
-                        value={categoryUz}
-                        onChange={(e) => setCategoryUz(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                        placeholder={locale === "uz" ? "" : "ixtiyoriy"}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelUnit")}</label>
-                    <input
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 max-w-md"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -392,7 +355,7 @@ export default function Products() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -406,22 +369,6 @@ export default function Products() {
             </div>
           </div>
 
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
-          >
-            <option value="all">{t("products.filterAllCat")}</option>
-            <option value="Chemicals">{t("products.catChemicals")}</option>
-            <option value="Safety Equipment">{t("products.catSafety")}</option>
-            {categories
-              .filter((c) => c !== "Chemicals" && c !== "Safety Equipment")
-              .map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-          </select>
 
           <select
             value={statusFilter}
@@ -476,13 +423,11 @@ export default function Products() {
               </div>
 
               <h3 className="font-semibold text-slate-900 mb-1">{productName(product, locale)}</h3>
-              <p className="text-sm text-slate-600 mb-3">{productCategory(product, locale)}</p>
-
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">{t("common.qty")}:</span>
                   <span className="font-medium text-slate-900">
-                    {product.quantity} {product.unit}
+                    {product.quantity}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -521,8 +466,7 @@ export default function Products() {
                 <tr>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colPhoto")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colProduct")}</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colCategory")}</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colQtyShort")}</th>
+                                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colQtyShort")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colPrice")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colSupplier")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colStatus")}</th>
@@ -536,9 +480,8 @@ export default function Products() {
                     <td className="px-6 py-4">
                       <p className="font-medium text-slate-900">{productName(product, locale)}</p>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{productCategory(product, locale)}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      {product.quantity} {product.unit}
+                                        <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                      {product.quantity}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-900">{product.price.toLocaleString()} UZS</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{product.supplier}</td>
@@ -569,7 +512,6 @@ export default function Products() {
             type="button"
             onClick={() => {
               setSearchQuery("");
-              setCategoryFilter("all");
               setStatusFilter("all");
             }}
             className="text-slate-600 hover:underline"

@@ -9,9 +9,6 @@ import {
   Line,
   BarChart as RechartsBar,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,8 +20,6 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { dateInRange } from '../lib/warehouseUtils';
 import { exportAnalyticsToXlsx } from '../lib/exportAnalyticsXlsx';
-
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 function defaultRange() {
   const end = new Date();
@@ -130,21 +125,6 @@ export default function Analytics() {
     }
   }, [debts, startDate, endDate, dateFnsLocale]);
 
-  const categoryDistribution = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const p of products) {
-      const v = p.price * p.quantity;
-      map.set(p.category, (map.get(p.category) ?? 0) + v);
-    }
-    const total = [...map.values()].reduce((a, b) => a + b, 0);
-    if (total <= 0) return [];
-    return [...map.entries()].map(([name, value]) => ({
-      name,
-      value,
-      percentage: Math.round((value / total) * 100),
-    }));
-  }, [products]);
-
   const topProducts = useMemo(() => {
     return [...products]
       .map((p) => ({ name: p.name, quantity: p.quantity, value: p.price * p.quantity }))
@@ -161,7 +141,6 @@ export default function Analytics() {
         stats,
         monthlyInventoryData,
         debtAnalytics,
-        categoryDistribution,
         topProducts,
         totalWarehouseValue,
       });
@@ -291,38 +270,6 @@ export default function Analytics() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200/80 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">{t('analytics.chartCategories')}</h3>
-            <span className="text-xs text-slate-600">{t('analytics.chartCategoriesHint')}</span>
-          </div>
-          {categoryDistribution.length === 0 ? (
-            <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartCategoriesEmpty')}</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percentage }: { name: string; percentage?: number }) => `${name} (${percentage ?? 0}%)`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

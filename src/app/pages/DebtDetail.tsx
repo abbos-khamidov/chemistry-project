@@ -34,6 +34,7 @@ export default function DebtDetail() {
   const [personName, setPersonName] = useState('');
   const [companyPay, setCompanyPay] = useState('');
   const [amountPay, setAmountPay] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'partial' | 'full'>('partial');
   const [productKey, setProductKey] = useState(GENERAL_PRODUCT);
 
   if (!debt) {
@@ -109,7 +110,7 @@ export default function DebtDetail() {
   const submitPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !isDirector) return;
-    const amt = Number(amountPay);
+    const amt = paymentMode === 'full' ? debt.remainingAmount : Number(amountPay);
     const result = applyDebtPayment(id, {
       personName: personName.trim(),
       company: companyPay.trim(),
@@ -134,6 +135,7 @@ export default function DebtDetail() {
     setPersonName('');
     setCompanyPay('');
     setAmountPay('');
+    setPaymentMode('partial');
     setProductKey(GENERAL_PRODUCT);
   };
 
@@ -236,17 +238,34 @@ export default function DebtDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-700 mb-1">Сумма (UZS), не больше {debt.remainingAmount.toLocaleString()}</label>
-                <input
-                  required
-                  type="number"
-                  min={1}
-                  max={debt.remainingAmount}
-                  value={amountPay}
-                  onChange={(e) => setAmountPay(e.target.value)}
+                <label className="block text-sm text-slate-700 mb-1">Тип погашения</label>
+                <select
+                  value={paymentMode}
+                  onChange={(e) => setPaymentMode(e.target.value as 'partial' | 'full')}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                />
+                >
+                  <option value="partial">Частичное погашение</option>
+                  <option value="full">Полное погашение</option>
+                </select>
               </div>
+              {paymentMode === 'full' ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-sm text-emerald-900">К погашению: <span className="font-semibold">{debt.remainingAmount.toLocaleString()} UZS</span></p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">Сумма (UZS), не больше {debt.remainingAmount.toLocaleString()}</label>
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={debt.remainingAmount}
+                    value={amountPay}
+                    onChange={(e) => setAmountPay(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm text-slate-700 mb-1">Товар / основание погашения</label>
                 <select

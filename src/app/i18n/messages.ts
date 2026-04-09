@@ -250,7 +250,8 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     debts: {
       pageTitle: 'Должники',
       records: 'Записей',
-      workerHint: 'Вы оформляете выдачу товара в долг один раз: после сохранения запись изменяет только директор (оплаты и правки).',
+      workerHint:
+        'Выдачу в долг оформляйте в карточке товара («Товары»). Здесь — список долгов; оплату и правки вносит директор.',
       addDebt: 'Добавить долг',
       issueProduct: 'Выдать товар',
       modalTitle: 'Новый долг',
@@ -624,7 +625,8 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     debts: {
       pageTitle: 'Qarzdorlar',
       records: 'Yozuvlar',
-      workerHint: 'Tovarni qarzga berish bir marta rasmiylashtiriladi; keyin yozuvni faqat direktor o‘zgartiradi.',
+      workerHint:
+        'Qarzga berishni tovar kartochkasida («Tovarlar») rasmiylashtiring. Bu yerda — ro‘yxat; to‘lov va tahrirlarni direktor kiritadi.',
       addDebt: 'Qarz qo‘shish',
       issueProduct: 'Tovar berish',
       modalTitle: 'Yangi qarz',

@@ -32,7 +32,7 @@ function defaultRange() {
 }
 
 export default function Analytics() {
-  const { products, debts } = useWarehouse();
+  const { products, debts, clientSales } = useWarehouse();
   const { t, formatUzs, locale } = useI18n();
   const dateFnsLocale = useMemo(() => (locale === 'uz' ? uz : ru), [locale]);
   const dr = defaultRange();
@@ -56,6 +56,9 @@ export default function Analytics() {
         if (dateInRange(ph.date, startDate, endDate)) collectedInRange += ph.amount;
       }
     }
+    for (const sale of clientSales ?? []) {
+      if (dateInRange(sale.date, startDate, endDate)) collectedInRange += sale.amountUzs;
+    }
     const overdueDebts = debts.filter((d) => d.status === 'overdue').length;
     return {
       totalWarehouseValue,
@@ -64,7 +67,7 @@ export default function Analytics() {
       operationsInRange,
       overdueDebts,
     };
-  }, [products, debts, startDate, endDate]);
+  }, [products, debts, clientSales, startDate, endDate]);
 
   const monthlyInventoryData = useMemo(() => {
     try {

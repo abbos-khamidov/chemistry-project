@@ -14,7 +14,9 @@ import {
   UserCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
+import { productName } from '../lib/productLocale';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { BrandLogo } from './BrandLogo';
 import { NotificationsPopover } from './NotificationsPopover';
@@ -23,10 +25,13 @@ import { ProfileDialog } from './ProfileDialog';
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
-  const { t } = useI18n();
+  const { products, debts, clientSales } = useWarehouse();
+  const { t, locale } = useI18n();
 
   const navigation = useMemo(() => {
     if (currentUser.role === 'director') {
@@ -62,6 +67,46 @@ export default function Layout() {
 
   const searchPlaceholder =
     currentUser.role === 'director' ? t('layout.searchDirector') : t('layout.searchWorker');
+
+  const workerSuggestions = useMemo(() => {
+    if (currentUser.role !== 'worker') return [] as Array<{ key: string; title: string; subtitle: string; to: string }>;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [] as Array<{ key: string; title: string; subtitle: string; to: string }>;
+
+    const out: Array<{ key: string; title: string; subtitle: string; to: string }> = [];
+
+    for (const pr of products) {
+      const title = productName(pr, locale);
+      const blob = [title, pr.name, pr.nameUz ?? '', String(pr.price), String(pr.quantity)].join(' ').toLowerCase();
+      if (blob.includes(q)) {
+        out.push({ key: `p:${pr.id}`, title, subtitle: t('layout.navProducts'), to: `/products/${pr.id}` });
+      }
+    }
+
+    for (const d of debts) {
+      const blob = [d.fullName, d.phone, d.company ?? ''].join(' ').toLowerCase();
+      if (blob.includes(q)) {
+        out.push({ key: `d:${d.id}`, title: d.fullName, subtitle: t('layout.navDebts'), to: `/debts/${d.id}` });
+      }
+    }
+
+    for (const c of clientSales) {
+      const blob = [c.fullName, c.phone, c.productName, c.company ?? ''].join(' ').toLowerCase();
+      if (blob.includes(q)) {
+        out.push({ key: `c:${c.id}`, title: c.fullName, subtitle: `${t('layout.navClients')} · ${c.productName}`, to: '/clients' });
+      }
+    }
+
+    const seen = new Set<string>();
+    const uniq: Array<{ key: string; title: string; subtitle: string; to: string }> = [];
+    for (const row of out) {
+      if (seen.has(row.key)) continue;
+      seen.add(row.key);
+      uniq.push(row);
+      if (uniq.length >= 8) break;
+    }
+    return uniq;
+  }, [currentUser.role, searchQuery, products, debts, clientSales, locale, t]);
 
   const mobileCols =
     navigation.length >= 7
@@ -153,12 +198,42 @@ export default function Layout() {
 
             <div className="flex-1 max-w-lg mx-4 hidden sm:block">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
                   placeholder={searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800 placeholder:text-slate-400"
                 />
+                {currentUser.role === 'worker' && searchFocused && searchQuery.trim().length > 0 && (
+                  <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-40">
+                    {workerSuggestions.length > 0 ? (
+                      <div className="max-h-72 overflow-y-auto">
+                        {workerSuggestions.map((row) => (
+                          <button
+                            key={row.key}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              navigate(row.to);
+                              setSearchQuery('');
+                              setSearchFocused(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                          >
+                            <p className="text-sm font-medium text-slate-900 truncate">{row.title}</p>
+                            <p className="text-xs text-slate-500 truncate mt-0.5">{row.subtitle}</p>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-3 text-sm text-slate-500">{t('common.found')}: 0</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

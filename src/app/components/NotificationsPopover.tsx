@@ -6,7 +6,7 @@ import { useI18n } from '../i18n/I18nContext';
 const MAX_ITEMS = 50;
 
 export function NotificationsPopover() {
-  const { auditLog, readAuditIds, markAuditRead } = useWarehouse();
+  const { auditLog, readAuditIds, markAuditRead, markAllAuditRead } = useWarehouse();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -50,8 +50,21 @@ export function NotificationsPopover() {
           role="dialog"
         >
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-            <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{t('notifications.title')}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('notifications.subtitle')}</p>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{t('notifications.title')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('notifications.subtitle')}</p>
+              </div>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllAuditRead}
+                  className="shrink-0 text-xs font-medium text-slate-700 dark:text-slate-200 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  {t('notifications.markAllRead')}
+                </button>
+              )}
+            </div>
           </div>
           <div className="overflow-y-auto flex-1 p-2">
             {rows.length === 0 ? (

@@ -140,6 +140,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       subtitle: 'Последние действия в системе',
       empty: 'Пока нет записей — появятся после действий.',
       markRead: 'Прочитано',
+      markAllRead: 'Прочитать все',
     },
     audit: {
       pageTitle: 'Журнал аудита',
@@ -537,6 +538,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       subtitle: "So'nggi harakatlar",
       empty: "Hozircha yozuv yo'q.",
       markRead: "O'qilgan",
+      markAllRead: "Hammasini o'qish",
     },
     audit: {
       pageTitle: 'Audit jurnali',

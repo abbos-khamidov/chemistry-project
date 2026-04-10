@@ -396,6 +396,7 @@ type WarehouseContextValue = WarehousePersisted & {
   recordClientSale: (input: RecordClientSaleInput) => { ok: true } | { ok: false; error: string };
   appendAudit: (entry: Omit<AuditLogEntry, 'id' | 'at'>) => void;
   markAuditRead: (auditId: string) => void;
+  markAllAuditRead: () => void;
 };
 
 const WarehouseContext = createContext<WarehouseContextValue | null>(null);
@@ -758,6 +759,13 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     [commit]
   );
 
+  const markAllAuditRead = useCallback(() => {
+    const prev = dataRef.current;
+    const allIds = prev.auditLog.map((row) => row.id);
+    if (allIds.length === 0) return;
+    commit({ ...prev, readAuditIds: allIds });
+  }, [commit]);
+
   const value = useMemo(
     () => ({
       ...data,
@@ -770,6 +778,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       recordClientSale,
       appendAudit,
       markAuditRead,
+      markAllAuditRead,
     }),
     [
       data,
@@ -782,6 +791,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       recordClientSale,
       appendAudit,
       markAuditRead,
+      markAllAuditRead,
     ]
   );
 

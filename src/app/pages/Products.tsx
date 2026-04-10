@@ -35,7 +35,15 @@ export default function Products() {
     const q = searchQuery.toLowerCase();
     const blob = [product.name, product.nameUz ?? ""].join(" ").toLowerCase();
     const matchesSearch = !q.trim() || blob.includes(q);
-    const matchesStatus = statusFilter === "all" || product.status === statusFilter;
+
+    let matchesStatus = true;
+    if (statusFilter === "in-stock") {
+      // "В наличии" means any positive stock, including low-stock items.
+      matchesStatus = product.quantity > 0;
+    } else if (statusFilter !== "all") {
+      matchesStatus = product.status === statusFilter;
+    }
+
     return matchesSearch && matchesStatus;
   });
 

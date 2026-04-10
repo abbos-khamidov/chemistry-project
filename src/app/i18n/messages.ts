@@ -23,7 +23,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     profile: {
       title: 'Профиль',
       directorHint: 'Данные учётной записи и список пользователей. Логин и пароль меняет только директор.',
-      workerHint: 'Можно менять имя и телефон в профиле. Логин и пароль меняет директор.',
+      workerHint: 'Просмотр данных профиля. Логин и пароль меняет директор.',
       credentialsHint: 'Чтобы сменить логин или пароль, введите текущий пароль ниже.',
       changePassword: 'Смена пароля',
       currentPassword: 'Текущий пароль',
@@ -420,7 +420,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     profile: {
       title: 'Profil',
       directorHint: "Hisob va foydalanuvchilar. Login va parolni faqat direktor o'zgartiradi.",
-      workerHint: "Profil ichida ism va telefonni o'zgartirish mumkin. Login va parolni direktor o'zgartiradi.",
+      workerHint: "Profil. Login va parolni direktor o'zgartiradi.",
       credentialsHint: "Login yoki parolni almashtirish uchun joriy parolni kiriting.",
       changePassword: 'Parolni almashtirish',
       currentPassword: 'Joriy parol',

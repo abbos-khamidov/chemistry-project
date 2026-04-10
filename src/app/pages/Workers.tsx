@@ -80,7 +80,7 @@ export default function Workers() {
     setEditPassword('');
   };
 
-  const handleEditSave = (e: React.FormEvent) => {
+  const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!allowManageStaff) {
       toast.error('Недостаточно прав');
@@ -111,7 +111,7 @@ export default function Workers() {
     };
 
     setEditSaving(true);
-    const result = updateStaffAccountByDirector(user, editWorker.id, payload);
+    const result = await updateStaffAccountByDirector(user, editWorker.id, payload);
     setEditSaving(false);
     if (!result.ok) {
       toast.error(result.error ?? t('workers.toastCredsFail'));
@@ -130,14 +130,14 @@ export default function Workers() {
     closeEdit();
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!allowManageStaff) {
       toast.error('Недостаточно прав');
       return;
     }
     setSubmitting(true);
-    const result = createStaffAccount(user, {
+    const result = await createStaffAccount(user, {
       role: staffRole,
       permissions: staffRole === 'assistant' ? {
         analytics: permAnalytics,
@@ -194,7 +194,7 @@ export default function Workers() {
     toast.success(t('workers.toastCopied'));
   };
 
-  const runConfirmedAction = () => {
+  const runConfirmedAction = async () => {
     if (!allowManageStaff) {
       toast.error('Недостаточно прав');
       return;
@@ -203,7 +203,7 @@ export default function Workers() {
     const w = pending.worker;
 
     if (pending.type === 'delete') {
-      const result = deleteWorkerAccount(user, w.id);
+      const result = await deleteWorkerAccount(user, w.id);
       if (!result.ok) {
         toast.error(result.error ?? t('workers.toastDeleteFail'));
         return;
@@ -222,7 +222,7 @@ export default function Workers() {
     }
 
     const nextStatus = pending.type === 'deactivate' ? 'inactive' : 'active';
-    const result = setWorkerStatus(user, w.id, nextStatus);
+    const result = await setWorkerStatus(user, w.id, nextStatus);
     if (!result.ok) {
       toast.error(result.error ?? t('workers.toastStatusFail'));
       return;

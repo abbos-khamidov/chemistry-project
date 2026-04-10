@@ -10,8 +10,8 @@ import {
 } from 'react';
 import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, WorkerKPI, ClientSale } from '../data/mockData';
 import { deriveProductStatus } from '../lib/warehouseUtils';
-
-const STORAGE_KEY = 'warehouse-app-data-v2';
+import { getSessionUserIdFromCookie } from '../lib/sessionCookie';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 export type WarehousePersisted = {
   products: Product[];
@@ -19,7 +19,6 @@ export type WarehousePersisted = {
   clientSales: ClientSale[];
   workerKpis: WorkerKPI[];
   auditLog: AuditLogEntry[];
-  /** id записей аудита, отмеченных как прочитанные в уведомлениях */
   readAuditIds: string[];
 };
 
@@ -41,29 +40,6 @@ function normalizeDebt(d: Debt): Debt {
   };
 }
 
-function load(): WarehousePersisted {
-  if (typeof window === 'undefined') return empty();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return empty();
-    const p = JSON.parse(raw) as Partial<WarehousePersisted>;
-    return {
-      products: Array.isArray(p.products) ? p.products : [],
-      debts: Array.isArray(p.debts) ? p.debts.map((x) => normalizeDebt(x as Debt)) : [],
-      clientSales: Array.isArray(p.clientSales) ? (p.clientSales as ClientSale[]) : [],
-      workerKpis: Array.isArray(p.workerKpis) ? p.workerKpis : [],
-      auditLog: Array.isArray(p.auditLog) ? p.auditLog : [],
-      readAuditIds: Array.isArray(p.readAuditIds) ? p.readAuditIds : [],
-    };
-  } catch {
-    return empty();
-  }
-}
-
-function save(data: WarehousePersisted) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
 function uid() {
   return crypto.randomUUID();
 }
@@ -78,6 +54,296 @@ function debtStatusAfterPayment(remaining: number, paid: number, dueDate: string
   if (paid > 0) return 'partial';
   const today = new Date().toISOString().slice(0, 10);
   return dueDate < today ? 'overdue' : 'active';
+}
+
+type ProductRow = {
+  id: string;
+  name: string;
+  name_uz: string | null;
+  image_url: string | null;
+  category: string;
+  category_uz: string | null;
+  quantity: number;
+  unit: string;
+  price: string | number;
+  supplier: string;
+  expiration_date: string;
+  status: string;
+  notes: string | null;
+  shipment_recipient: Product['shipmentRecipient'] | null;
+  history: Product['history'] | null;
+};
+
+type DebtRow = {
+  id: string;
+  full_name: string;
+  phone: string;
+  company: string | null;
+  created_by_role: Debt['createdByRole'] | null;
+  created_by_user_id: string | null;
+  total_amount: string | number;
+  paid_amount: string | number;
+  remaining_amount: string | number;
+  issue_date: string;
+  due_date: string;
+  status: Debt['status'];
+  products: Debt['products'] | null;
+  notes: string | null;
+  debt_history: Debt['debtHistory'] | null;
+  payment_history: Debt['paymentHistory'] | null;
+};
+
+type ClientSaleRow = {
+  id: string;
+  full_name: string;
+  phone: string;
+  company: string | null;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  amount_uzs: string | number;
+  date: string;
+  created_by_user_id: string | null;
+  created_by_role: ClientSale['createdByRole'] | null;
+};
+
+type WorkerKpiRow = {
+  user_id: string;
+  full_name: string;
+  operations_count: number;
+  reception_accuracy: string | number;
+  deadline_compliance: string | number;
+  tasks_on_time: number;
+  period: string;
+  period_start: string;
+  period_end: string;
+};
+
+type AuditLogRow = {
+  id: string;
+  at: string;
+  user_name: string;
+  user_role: 'director' | 'assistant' | 'worker';
+  action: string;
+  entity: string;
+  details: string;
+  ip: string;
+};
+
+async function loadFromDb(): Promise<WarehousePersisted> {
+  if (!isSupabaseConfigured) return empty();
+
+  const userId = getSessionUserIdFromCookie();
+
+  const [
+    productsRes,
+    debtsRes,
+    salesRes,
+    kpiRes,
+    auditRes,
+    readsRes,
+  ] = await Promise.all([
+    supabase.from('products').select('*'),
+    supabase.from('debts').select('*'),
+    supabase.from('client_sales').select('*'),
+    supabase.from('worker_kpis').select('*'),
+    supabase.from('audit_log').select('*').order('at', { ascending: false }),
+    userId ? supabase.from('audit_reads').select('audit_id').eq('user_id', userId) : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const products = ((productsRes.data as ProductRow[] | null) ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    nameUz: r.name_uz ?? undefined,
+    imageUrl: r.image_url ?? undefined,
+    category: r.category,
+    categoryUz: r.category_uz ?? undefined,
+    quantity: Number(r.quantity ?? 0),
+    unit: r.unit,
+    price: Number(r.price ?? 0),
+    supplier: r.supplier,
+    expirationDate: r.expiration_date,
+    status: (r.status as Product['status']) ?? 'in-stock',
+    notes: r.notes ?? undefined,
+    shipmentRecipient: r.shipment_recipient ?? undefined,
+    history: Array.isArray(r.history) ? r.history : [],
+  }));
+
+  const debts = ((debtsRes.data as DebtRow[] | null) ?? []).map((r) =>
+    normalizeDebt({
+      id: r.id,
+      fullName: r.full_name,
+      phone: r.phone,
+      company: r.company ?? undefined,
+      createdByRole: r.created_by_role ?? undefined,
+      createdByUserId: r.created_by_user_id ?? undefined,
+      totalAmount: Number(r.total_amount ?? 0),
+      paidAmount: Number(r.paid_amount ?? 0),
+      remainingAmount: Number(r.remaining_amount ?? 0),
+      issueDate: r.issue_date,
+      dueDate: r.due_date,
+      status: r.status,
+      products: Array.isArray(r.products) ? r.products : [],
+      notes: r.notes ?? undefined,
+      debtHistory: Array.isArray(r.debt_history) ? r.debt_history : [],
+      paymentHistory: Array.isArray(r.payment_history) ? r.payment_history : [],
+    })
+  );
+
+  const clientSales = ((salesRes.data as ClientSaleRow[] | null) ?? []).map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    phone: r.phone,
+    company: r.company ?? undefined,
+    productId: r.product_id,
+    productName: r.product_name,
+    quantity: Number(r.quantity ?? 0),
+    amountUzs: Number(r.amount_uzs ?? 0),
+    date: r.date,
+    createdByUserId: r.created_by_user_id ?? undefined,
+    createdByRole: r.created_by_role ?? undefined,
+  }));
+
+  const workerKpis = ((kpiRes.data as WorkerKpiRow[] | null) ?? []).map((r) => ({
+    userId: r.user_id,
+    fullName: r.full_name,
+    operationsCount: Number(r.operations_count ?? 0),
+    receptionAccuracy: Number(r.reception_accuracy ?? 0),
+    deadlineCompliance: Number(r.deadline_compliance ?? 0),
+    tasksOnTime: Number(r.tasks_on_time ?? 0),
+    period: r.period,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+  }));
+
+  const auditLog = ((auditRes.data as AuditLogRow[] | null) ?? []).map((r) => ({
+    id: r.id,
+    at: r.at,
+    userName: r.user_name,
+    userRole: r.user_role,
+    action: r.action,
+    entity: r.entity,
+    details: r.details,
+    ip: r.ip,
+  }));
+
+  const readAuditIds = (((readsRes as any).data as Array<{ audit_id: string }> | null) ?? []).map((r) => r.audit_id);
+
+  return { products, debts, clientSales, workerKpis, auditLog, readAuditIds };
+}
+
+function toProductRows(products: Product[]): ProductRow[] {
+  return products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    name_uz: p.nameUz ?? null,
+    image_url: p.imageUrl ?? null,
+    category: p.category,
+    category_uz: p.categoryUz ?? null,
+    quantity: p.quantity,
+    unit: p.unit,
+    price: p.price,
+    supplier: p.supplier,
+    expiration_date: p.expirationDate,
+    status: p.status,
+    notes: p.notes ?? null,
+    shipment_recipient: p.shipmentRecipient ?? null,
+    history: p.history,
+  }));
+}
+
+function toDebtRows(debts: Debt[]): DebtRow[] {
+  return debts.map((d) => ({
+    id: d.id,
+    full_name: d.fullName,
+    phone: d.phone,
+    company: d.company ?? null,
+    created_by_role: d.createdByRole ?? null,
+    created_by_user_id: d.createdByUserId ?? null,
+    total_amount: d.totalAmount,
+    paid_amount: d.paidAmount,
+    remaining_amount: d.remainingAmount,
+    issue_date: d.issueDate,
+    due_date: d.dueDate,
+    status: d.status,
+    products: d.products,
+    notes: d.notes ?? null,
+    debt_history: d.debtHistory,
+    payment_history: d.paymentHistory,
+  }));
+}
+
+function toClientSaleRows(rows: ClientSale[]): ClientSaleRow[] {
+  return rows.map((r) => ({
+    id: r.id,
+    full_name: r.fullName,
+    phone: r.phone,
+    company: r.company ?? null,
+    product_id: r.productId,
+    product_name: r.productName,
+    quantity: r.quantity,
+    amount_uzs: r.amountUzs,
+    date: r.date,
+    created_by_user_id: r.createdByUserId ?? null,
+    created_by_role: r.createdByRole ?? null,
+  }));
+}
+
+function toWorkerKpiRows(rows: WorkerKPI[]): WorkerKpiRow[] {
+  return rows.map((r) => ({
+    user_id: r.userId,
+    full_name: r.fullName,
+    operations_count: r.operationsCount,
+    reception_accuracy: r.receptionAccuracy,
+    deadline_compliance: r.deadlineCompliance,
+    tasks_on_time: r.tasksOnTime,
+    period: r.period,
+    period_start: r.periodStart,
+    period_end: r.periodEnd,
+  }));
+}
+
+function toAuditRows(rows: AuditLogEntry[]): AuditLogRow[] {
+  return rows.map((r) => ({
+    id: r.id,
+    at: r.at,
+    user_name: r.userName,
+    user_role: r.userRole,
+    action: r.action,
+    entity: r.entity,
+    details: r.details,
+    ip: r.ip,
+  }));
+}
+
+async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
+  if (!isSupabaseConfigured) return;
+
+  const deleteMissing = async (table: string, prevIds: string[], nextIds: string[]) => {
+    const removed = prevIds.filter((id) => !nextIds.includes(id));
+    if (removed.length > 0) {
+      await supabase.from(table).delete().in('id', removed);
+    }
+  };
+
+  await deleteMissing('products', prev.products.map((x) => x.id), next.products.map((x) => x.id));
+  await deleteMissing('debts', prev.debts.map((x) => x.id), next.debts.map((x) => x.id));
+  await deleteMissing('client_sales', prev.clientSales.map((x) => x.id), next.clientSales.map((x) => x.id));
+  await deleteMissing('audit_log', prev.auditLog.map((x) => x.id), next.auditLog.map((x) => x.id));
+
+  if (next.products.length > 0) await supabase.from('products').upsert(toProductRows(next.products), { onConflict: 'id' });
+  if (next.debts.length > 0) await supabase.from('debts').upsert(toDebtRows(next.debts), { onConflict: 'id' });
+  if (next.clientSales.length > 0) await supabase.from('client_sales').upsert(toClientSaleRows(next.clientSales), { onConflict: 'id' });
+  if (next.workerKpis.length > 0) await supabase.from('worker_kpis').upsert(toWorkerKpiRows(next.workerKpis));
+  if (next.auditLog.length > 0) await supabase.from('audit_log').upsert(toAuditRows(next.auditLog), { onConflict: 'id' });
+
+  const userId = getSessionUserIdFromCookie();
+  if (userId) {
+    await supabase.from('audit_reads').delete().eq('user_id', userId);
+    if (next.readAuditIds.length > 0) {
+      await supabase.from('audit_reads').insert(next.readAuditIds.map((auditId) => ({ user_id: userId, audit_id: auditId })));
+    }
+  }
 }
 
 export type AddProductInput = Omit<Product, 'id' | 'history' | 'status'> & {
@@ -135,16 +401,66 @@ type WarehouseContextValue = WarehousePersisted & {
 const WarehouseContext = createContext<WarehouseContextValue | null>(null);
 
 export function WarehouseProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<WarehousePersisted>(() => load());
+  const [data, setData] = useState<WarehousePersisted>(() => empty());
   const dataRef = useRef(data);
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const loaded = await loadFromDb();
+      if (!active) return;
+      dataRef.current = loaded;
+      setData(loaded);
+    })();
+
+    if (!isSupabaseConfigured) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const channel = supabase
+      .channel('warehouse-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+        const loaded = await loadFromDb();
+        if (!active) return;
+        dataRef.current = loaded;
+        setData(loaded);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, async () => {
+        const loaded = await loadFromDb();
+        if (!active) return;
+        dataRef.current = loaded;
+        setData(loaded);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_sales' }, async () => {
+        const loaded = await loadFromDb();
+        if (!active) return;
+        dataRef.current = loaded;
+        setData(loaded);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, async () => {
+        const loaded = await loadFromDb();
+        if (!active) return;
+        dataRef.current = loaded;
+        setData(loaded);
+      })
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const commit = useCallback((next: WarehousePersisted) => {
+    const prev = dataRef.current;
     dataRef.current = next;
-    save(next);
     setData(next);
+    void syncRemote(prev, next);
   }, []);
 
   const appendAudit = useCallback(
@@ -455,7 +771,18 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       appendAudit,
       markAuditRead,
     }),
-    [data, addProduct, updateProduct, deleteProduct, addProductInbound, addDebt, applyDebtPayment, recordClientSale, appendAudit, markAuditRead]
+    [
+      data,
+      addProduct,
+      updateProduct,
+      deleteProduct,
+      addProductInbound,
+      addDebt,
+      applyDebtPayment,
+      recordClientSale,
+      appendAudit,
+      markAuditRead,
+    ]
   );
 
   return <WarehouseContext.Provider value={value}>{children}</WarehouseContext.Provider>;

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -19,10 +20,10 @@ export default function Login() {
     navigate(target, { replace: true });
   }, [user, navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const result = login(username, password);
+    const result = await login(username, password);
     if (!result.ok) {
       setError(result.error ?? t('login.errorGeneric'));
       return;

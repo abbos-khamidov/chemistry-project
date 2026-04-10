@@ -88,12 +88,19 @@ export default function Layout() {
   const searchPlaceholder =
     currentUser.role === 'director' ? t('layout.searchDirector') : t('layout.searchWorker');
 
-  const workerSuggestions = useMemo(() => {
-    if (currentUser.role !== 'worker') return [] as Array<{ key: string; title: string; subtitle: string; to: string }>;
+  const globalSuggestions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [] as Array<{ key: string; title: string; subtitle: string; to: string }>;
 
     const out: Array<{ key: string; title: string; subtitle: string; to: string }> = [];
+
+    for (const item of navigation) {
+      const title = t(item.nameKey);
+      const blob = `${title} ${item.href}`.toLowerCase();
+      if (blob.includes(q)) {
+        out.push({ key: `nav:${item.href}`, title, subtitle: t('layout.searchSection'), to: item.href });
+      }
+    }
 
     for (const pr of products) {
       const title = productName(pr, locale);
@@ -123,10 +130,10 @@ export default function Layout() {
       if (seen.has(row.key)) continue;
       seen.add(row.key);
       uniq.push(row);
-      if (uniq.length >= 8) break;
+      if (uniq.length >= 10) break;
     }
     return uniq;
-  }, [currentUser.role, searchQuery, products, debts, clientSales, locale, t]);
+  }, [searchQuery, navigation, products, debts, clientSales, locale, t]);
 
   const mobileCols =
     navigation.length >= 7
@@ -228,11 +235,11 @@ export default function Layout() {
                   onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800 placeholder:text-slate-400"
                 />
-                {currentUser.role === 'worker' && searchFocused && searchQuery.trim().length > 0 && (
+                {searchFocused && searchQuery.trim().length > 0 && (
                   <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-40">
-                    {workerSuggestions.length > 0 ? (
+                    {globalSuggestions.length > 0 ? (
                       <div className="max-h-72 overflow-y-auto">
-                        {workerSuggestions.map((row) => (
+                        {globalSuggestions.map((row) => (
                           <button
                             key={row.key}
                             type="button"

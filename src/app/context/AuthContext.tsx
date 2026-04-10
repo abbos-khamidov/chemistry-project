@@ -205,6 +205,11 @@ export type UpdateWorkerCredentialsInput = {
   password?: string;
 };
 
+export type UpdateOwnProfileInput = {
+  fullName?: string;
+  phone?: string;
+};
+
 export type UpdateStaffByDirectorInput = {
   fullName?: string;
   phone?: string;
@@ -235,6 +240,7 @@ type AuthContextValue = {
     staffId: string,
     input: UpdateStaffByDirectorInput,
   ) => AuthResult;
+  updateOwnProfile: (user: User | null, input: UpdateOwnProfileInput) => AuthResult;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -451,6 +457,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistSession(null);
   }, [persistSession]);
 
+
+  const updateOwnProfile = useCallback(
+    (accountUser: User | null, input: UpdateOwnProfileInput): AuthResult => {
+      if (!accountUser) {
+        return { ok: false, error: 'Пользователь не найден' };
+      }
+      const list = loadAccounts();
+      const idx = list.findIndex((a) => a.id === accountUser.id);
+      if (idx === -1) {
+        return { ok: false, error: 'Учётная запись не найдена' };
+      }
+      const nextAcc: StoredAccount = { ...list[idx] };
+      if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
+      if (input.phone !== undefined) nextAcc.phone = input.phone.trim();
+      const next = [...list];
+      next[idx] = nextAcc;
+      saveAccounts(next);
+      setAccounts(next);
+      setUser(stripPassword(nextAcc));
+      return { ok: true, role: nextAcc.role };
+    },
+    []
+  );
+
   const updateDirectorProfile = useCallback(
     (director: User | null, input: UpdateDirectorProfileInput): AuthResult => {
       if (!director || director.role !== 'director') {
@@ -645,6 +675,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateDirectorProfile,
       updateWorkerCredentialsByDirector,
       updateStaffAccountByDirector,
+      updateOwnProfile,
     }),
     [
       user,
@@ -659,6 +690,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateDirectorProfile,
       updateWorkerCredentialsByDirector,
       updateStaffAccountByDirector,
+      updateOwnProfile,
     ]
   );
 

@@ -20,7 +20,7 @@ type Props = {
 };
 
 export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
-  const { user, workers, updateDirectorProfile } = useAuth();
+  const { user, workers, updateDirectorProfile, updateOwnProfile } = useAuth();
   const { t } = useI18n();
 
   const [fullName, setFullName] = useState('');
@@ -66,6 +66,18 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
     setCurrentPassword('');
     setNewPassword('');
     setPasswordConfirm('');
+  };
+
+  const handleSaveOwn = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    const result = updateOwnProfile(user, { fullName, phone });
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.error ?? t('profile.toastSaveFail'));
+      return;
+    }
+    toast.success(t('profile.toastSaveOk'));
   };
 
   return (
@@ -220,33 +232,52 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
             </DialogFooter>
           </form>
         ) : (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 p-4 space-y-2 text-sm">
-              <p>
-                <span className="text-slate-500">{t('workers.fullName')}: </span>
-                <span className="font-medium text-slate-900">{user.fullName}</span>
-              </p>
-              <p>
-                <span className="text-slate-500">{t('workers.phone')}: </span>
-                <span className="text-slate-900">{user.phone}</span>
-              </p>
+          <form onSubmit={handleSaveOwn} className="space-y-4">
+            <div className="rounded-lg border border-slate-200 p-4 space-y-3 text-sm">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.fullName')}</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.phone')}</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                  required
+                />
+              </div>
               <p>
                 <span className="text-slate-500">{t('workers.login')}: </span>
                 <span className="font-mono text-slate-900">@{user.username}</span>
               </p>
               <p className="text-xs text-slate-600 pt-2 border-t border-slate-100">{t('profile.workerCredentialsNote')}</p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <button
                 type="button"
                 onClick={() => onLogout()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 w-full sm:w-auto"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-slate-800 hover:bg-slate-50"
               >
                 <LogOut className="w-4 h-4" />
                 {t('layout.logout')}
               </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50"
+              >
+                {t('common.save')}
+              </button>
             </DialogFooter>
-          </div>
+          </form>
         )}
       </DialogContent>
     </Dialog>

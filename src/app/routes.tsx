@@ -14,7 +14,8 @@ import { DebtsVisibleOnly, DirectorOnly, DirectorOrWorker, RoleHomeRedirect, Sta
 import { useAuth } from "./context/AuthContext";
 
 function ProtectedLayout() {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
+  if (!isAuthReady) return null;
   if (!user) return <Navigate to="/login" replace />;
   return <Layout />;
 }

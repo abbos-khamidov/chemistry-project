@@ -119,7 +119,10 @@ function readInitialSessionUserId(): string | null {
 async function fetchAccountsFromDb(): Promise<StoredAccount[]> {
   if (!isSupabaseConfigured) return seedAccounts();
   const { data, error } = await supabase.from('accounts').select('*').order('created_at', { ascending: true });
-  if (error || !data) return seedAccounts();
+  if (error || !data) {
+    console.error('[AuthContext] Failed to load accounts from Supabase:', error);
+    return seedAccounts();
+  }
   const rows = data as AccountRow[];
   if (rows.length === 0) {
     const seeded = seedAccounts();
@@ -132,12 +135,18 @@ async function fetchAccountsFromDb(): Promise<StoredAccount[]> {
 async function upsertAccountsToDb(accounts: StoredAccount[]): Promise<void> {
   if (!isSupabaseConfigured) return;
   const payload = accounts.map(storedToRow);
-  await supabase.from('accounts').upsert(payload, { onConflict: 'id' });
+  const { error } = await supabase.from('accounts').upsert(payload, { onConflict: 'id' });
+  if (error) {
+    console.error('[AuthContext] Failed to upsert accounts to Supabase:', error);
+  }
 }
 
 async function deleteAccountFromDb(accountId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
-  await supabase.from('accounts').delete().eq('id', accountId);
+  const { error } = await supabase.from('accounts').delete().eq('id', accountId);
+  if (error) {
+    console.error('[AuthContext] Failed to delete account in Supabase:', error);
+  }
 }
 
 export type UpdateDirectorProfileInput = {
@@ -170,6 +179,7 @@ export type UpdateStaffByDirectorInput = {
 
 type AuthContextValue = {
   user: User | null;
+  isAuthReady: boolean;
   workers: User[];
   login: (username: string, password: string) => Promise<AuthResult>;
   logout: () => void;
@@ -201,6 +211,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => seedAccounts());
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   const workers = useMemo(
     () => accounts.filter((a) => a.role === 'worker' || a.role === 'assistant').map(stripPassword),
@@ -226,13 +237,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const list = await fetchAccountsFromDb();
-      if (!active) return;
-      setAccounts(list);
-      const id = readInitialSessionUserId();
-      if (id) {
-        const acc = list.find((a) => a.id === id);
-        if (acc && acc.status === 'active') setUser(stripPassword(acc));
+      try {
+        const list = await fetchAccountsFromDb();
+        if (!active) return;
+        setAccounts(list);
+        const id = readInitialSessionUserId();
+        if (id) {
+          const acc = list.find((a) => a.id === id);
+          if (acc && acc.status === 'active') setUser(stripPassword(acc));
+        }
+      } finally {
+        if (active) setIsAuthReady(true);
       }
     })();
 
@@ -631,6 +646,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       user,
+      isAuthReady,
       workers,
       login,
       logout,
@@ -646,6 +662,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       user,
+      isAuthReady,
       workers,
       login,
       logout,

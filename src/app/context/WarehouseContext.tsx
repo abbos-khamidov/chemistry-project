@@ -13,6 +13,10 @@ import { deriveProductStatus } from '../lib/warehouseUtils';
 import { getSessionUserIdFromCookie } from '../lib/sessionCookie';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
+function logSupabaseError(scope: string, error: unknown) {
+  if (error) console.error(`[WarehouseContext] ${scope}:`, error);
+}
+
 export type WarehousePersisted = {
   products: Product[];
   debts: Debt[];
@@ -150,6 +154,13 @@ async function loadFromDb(): Promise<WarehousePersisted> {
     supabase.from('audit_log').select('*').order('at', { ascending: false }),
     userId ? supabase.from('audit_reads').select('audit_id').eq('user_id', userId) : Promise.resolve({ data: [], error: null }),
   ]);
+
+  logSupabaseError('products select failed', productsRes.error);
+  logSupabaseError('debts select failed', debtsRes.error);
+  logSupabaseError('client_sales select failed', salesRes.error);
+  logSupabaseError('worker_kpis select failed', kpiRes.error);
+  logSupabaseError('audit_log select failed', auditRes.error);
+  logSupabaseError('audit_reads select failed', (readsRes as any).error);
 
   const products = ((productsRes.data as ProductRow[] | null) ?? []).map((r) => ({
     id: r.id,
@@ -322,7 +333,8 @@ async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
   const deleteMissing = async (table: string, prevIds: string[], nextIds: string[]) => {
     const removed = prevIds.filter((id) => !nextIds.includes(id));
     if (removed.length > 0) {
-      await supabase.from(table).delete().in('id', removed);
+      const { error } = await supabase.from(table).delete().in('id', removed);
+      logSupabaseError(`${table} delete missing failed`, error);
     }
   };
 
@@ -331,17 +343,34 @@ async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
   await deleteMissing('client_sales', prev.clientSales.map((x) => x.id), next.clientSales.map((x) => x.id));
   await deleteMissing('audit_log', prev.auditLog.map((x) => x.id), next.auditLog.map((x) => x.id));
 
-  if (next.products.length > 0) await supabase.from('products').upsert(toProductRows(next.products), { onConflict: 'id' });
-  if (next.debts.length > 0) await supabase.from('debts').upsert(toDebtRows(next.debts), { onConflict: 'id' });
-  if (next.clientSales.length > 0) await supabase.from('client_sales').upsert(toClientSaleRows(next.clientSales), { onConflict: 'id' });
-  if (next.workerKpis.length > 0) await supabase.from('worker_kpis').upsert(toWorkerKpiRows(next.workerKpis));
-  if (next.auditLog.length > 0) await supabase.from('audit_log').upsert(toAuditRows(next.auditLog), { onConflict: 'id' });
+  if (next.products.length > 0) {
+    const { error } = await supabase.from('products').upsert(toProductRows(next.products), { onConflict: 'id' });
+    logSupabaseError('products upsert failed', error);
+  }
+  if (next.debts.length > 0) {
+    const { error } = await supabase.from('debts').upsert(toDebtRows(next.debts), { onConflict: 'id' });
+    logSupabaseError('debts upsert failed', error);
+  }
+  if (next.clientSales.length > 0) {
+    const { error } = await supabase.from('client_sales').upsert(toClientSaleRows(next.clientSales), { onConflict: 'id' });
+    logSupabaseError('client_sales upsert failed', error);
+  }
+  if (next.workerKpis.length > 0) {
+    const { error } = await supabase.from('worker_kpis').upsert(toWorkerKpiRows(next.workerKpis));
+    logSupabaseError('worker_kpis upsert failed', error);
+  }
+  if (next.auditLog.length > 0) {
+    const { error } = await supabase.from('audit_log').upsert(toAuditRows(next.auditLog), { onConflict: 'id' });
+    logSupabaseError('audit_log upsert failed', error);
+  }
 
   const userId = getSessionUserIdFromCookie();
   if (userId) {
-    await supabase.from('audit_reads').delete().eq('user_id', userId);
+    const { error: deleteReadsError } = await supabase.from('audit_reads').delete().eq('user_id', userId);
+    logSupabaseError('audit_reads delete failed', deleteReadsError);
     if (next.readAuditIds.length > 0) {
-      await supabase.from('audit_reads').insert(next.readAuditIds.map((auditId) => ({ user_id: userId, audit_id: auditId })));
+      const { error: insertReadsError } = await supabase.from('audit_reads').insert(next.readAuditIds.map((auditId) => ({ user_id: userId, audit_id: auditId })));
+      logSupabaseError('audit_reads insert failed', insertReadsError);
     }
   }
 }

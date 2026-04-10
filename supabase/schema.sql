@@ -141,27 +141,50 @@ alter table public.audit_log enable row level security;
 alter table public.audit_reads enable row level security;
 
 drop policy if exists p_accounts_all on public.accounts;
-create policy p_accounts_all on public.accounts for all to authenticated using (true) with check (true);
+create policy p_accounts_all on public.accounts for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists p_products_all on public.products;
-create policy p_products_all on public.products for all to authenticated using (true) with check (true);
+create policy p_products_all on public.products for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists p_debts_all on public.debts;
-create policy p_debts_all on public.debts for all to authenticated using (true) with check (true);
+create policy p_debts_all on public.debts for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists p_sales_all on public.client_sales;
-create policy p_sales_all on public.client_sales for all to authenticated using (true) with check (true);
+create policy p_sales_all on public.client_sales for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists p_kpi_all on public.worker_kpis;
-create policy p_kpi_all on public.worker_kpis for all to authenticated using (true) with check (true);
+create policy p_kpi_all on public.worker_kpis for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists p_audit_all on public.audit_log;
-create policy p_audit_all on public.audit_log for all to authenticated using (true) with check (true);
+create policy p_audit_all on public.audit_log for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists p_audit_reads_all on public.audit_reads;
-create policy p_audit_reads_all on public.audit_reads for all to authenticated using (true) with check (true);
+create policy p_audit_reads_all on public.audit_reads for all to anon, authenticated using (true) with check (true);
 
 -- Seed director account (clean start)
 insert into public.accounts (full_name, phone, username, password, role, status, last_activity, permissions)
 values ('Karimov Otabek', '+998 90 111 22 33', 'diyor', '1234', 'director', 'active', to_char(now(), 'YYYY-MM-DD HH24:MI'), null)
 on conflict (username) do nothing;
+
+-- Realtime publication for cross-device sync
+do $$
+begin
+  begin
+    alter publication supabase_realtime add table public.accounts;
+  exception when duplicate_object then null; end;
+  begin
+    alter publication supabase_realtime add table public.products;
+  exception when duplicate_object then null; end;
+  begin
+    alter publication supabase_realtime add table public.debts;
+  exception when duplicate_object then null; end;
+  begin
+    alter publication supabase_realtime add table public.client_sales;
+  exception when duplicate_object then null; end;
+  begin
+    alter publication supabase_realtime add table public.audit_log;
+  exception when duplicate_object then null; end;
+  begin
+    alter publication supabase_realtime add table public.audit_reads;
+  exception when duplicate_object then null; end;
+end$$;

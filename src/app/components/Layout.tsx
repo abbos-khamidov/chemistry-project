@@ -12,6 +12,8 @@ import {
   Wallet,
   Users,
   UserCircle,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
@@ -22,6 +24,7 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { BrandLogo } from './BrandLogo';
 import { NotificationsPopover } from './NotificationsPopover';
 import { ProfileDialog } from './ProfileDialog';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +36,7 @@ export default function Layout() {
   const { user: currentUser, logout } = useAuth();
   const { products, debts, clientSales } = useWarehouse();
   const { t, locale } = useI18n();
+  const { theme, toggleTheme } = useTheme();
   const perms = getPermissions(currentUser);
 
   const navigation = useMemo(() => {
@@ -251,6 +255,17 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center gap-2">
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+
               <LanguageSwitcher />
               <div className="hidden md:block px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-full">
                 {currentUser.role === 'director' ? t('layout.roleDirector') : currentUser.role === 'assistant' ? 'Ассистент' : t('layout.roleWorker')}

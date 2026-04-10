@@ -179,3 +179,56 @@
     line-height: 1.5;
   }
 }
+
+
+/* App-wide dark compatibility for existing slate/white utility classes */
+.dark body {
+  background-color: #0b1220;
+  color: #e2e8f0;
+}
+
+.dark [class*='bg-white'] {
+  background-color: #111827 !important;
+}
+
+.dark [class*='bg-slate-50'] {
+  background-color: #0f172a !important;
+}
+
+.dark [class*='bg-slate-100'] {
+  background-color: #1e293b !important;
+}
+
+.dark [class*='border-slate-200'],
+.dark [class*='border-slate-300'],
+.dark [class*='border-gray-200'] {
+  border-color: #334155 !important;
+}
+
+.dark [class*='text-slate-900'] {
+  color: #f1f5f9 !important;
+}
+
+.dark [class*='text-slate-800'] {
+  color: #e2e8f0 !important;
+}
+
+.dark [class*='text-slate-700'] {
+  color: #cbd5e1 !important;
+}
+
+.dark [class*='text-slate-600'],
+.dark [class*='text-slate-500'] {
+  color: #94a3b8 !important;
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+.dark ::placeholder {
+  color: #64748b !important;
+}

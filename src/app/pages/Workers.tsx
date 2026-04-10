@@ -5,16 +5,18 @@ import type { User } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
+import { canManageStaff } from '../lib/permissions';
 
 type PendingAction =
   | null
   | { type: 'deactivate' | 'activate' | 'delete'; worker: User };
 
 export default function Workers() {
-  const { user, workers, createStaffAccount, setWorkerStatus, setStaffPermissionsByDirector, deleteWorkerAccount, updateStaffAccountByDirector } =
+  const { user, workers, createStaffAccount, setWorkerStatus, deleteWorkerAccount, updateStaffAccountByDirector } =
     useAuth();
   const { appendAudit } = useWarehouse();
   const { t } = useI18n();
+  const allowManageStaff = canManageStaff(user);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
@@ -24,6 +26,7 @@ export default function Workers() {
   const [permAddProducts, setPermAddProducts] = useState(false);
   const [permEditProducts, setPermEditProducts] = useState(false);
   const [permIssueDebt, setPermIssueDebt] = useState(false);
+  const [permManageStaff, setPermManageStaff] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
@@ -35,6 +38,7 @@ export default function Workers() {
   const [editPermAddProducts, setEditPermAddProducts] = useState(false);
   const [editPermEditProducts, setEditPermEditProducts] = useState(false);
   const [editPermIssueDebt, setEditPermIssueDebt] = useState(false);
+  const [editPermManageStaff, setEditPermManageStaff] = useState(false);
   const [editUsername, setEditUsername] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editSaving, setEditSaving] = useState(false);
@@ -53,6 +57,7 @@ export default function Workers() {
     setEditPermAddProducts(Boolean(w.permissions?.addProducts));
     setEditPermEditProducts(Boolean(w.permissions?.editProducts));
     setEditPermIssueDebt(Boolean(w.permissions?.issueDebt));
+    setEditPermManageStaff(Boolean(w.permissions?.manageStaff));
     setEditUsername(w.username);
     setEditPassword('');
   };
@@ -66,12 +71,17 @@ export default function Workers() {
     setEditPermAddProducts(false);
     setEditPermEditProducts(false);
     setEditPermIssueDebt(false);
+    setEditPermManageStaff(false);
     setEditUsername('');
     setEditPassword('');
   };
 
   const handleEditSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!allowManageStaff) {
+      toast.error('Недостаточно прав');
+      return;
+    }
     if (!editWorker || !user) return;
 
     const u = editUsername.trim().toLowerCase();
@@ -88,6 +98,7 @@ export default function Workers() {
               addProducts: editPermAddProducts,
               editProducts: editPermEditProducts,
               issueDebt: editPermIssueDebt,
+              manageStaff: editPermManageStaff,
             }
           : undefined,
     };
@@ -114,6 +125,10 @@ export default function Workers() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!allowManageStaff) {
+      toast.error('Недостаточно прав');
+      return;
+    }
     setSubmitting(true);
     const result = createStaffAccount(user, {
       role: staffRole,
@@ -122,6 +137,7 @@ export default function Workers() {
         addProducts: permAddProducts,
         editProducts: permEditProducts,
         issueDebt: permIssueDebt,
+        manageStaff: permManageStaff,
       } : undefined,
 
       fullName,
@@ -154,6 +170,7 @@ export default function Workers() {
     setPermAddProducts(false);
     setPermEditProducts(false);
     setPermIssueDebt(false);
+    setPermManageStaff(false);
   };
 
   const copyCreds = () => {
@@ -167,6 +184,10 @@ export default function Workers() {
   };
 
   const runConfirmedAction = () => {
+    if (!allowManageStaff) {
+      toast.error('Недостаточно прав');
+      return;
+    }
     if (!pending || !user) return;
     const w = pending.worker;
 
@@ -408,7 +429,7 @@ export default function Workers() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={!allowManageStaff || submitting}
                 className="px-4 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
               >
                 {t("workers.create")}
@@ -450,6 +471,7 @@ export default function Workers() {
                           {w.permissions?.addProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Добавлять товары</span>}
                           {w.permissions?.editProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
                           {w.permissions?.issueDebt && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
+                          {w.permissions?.manageStaff && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Сотрудники</span>}
                         </>
                       )}
                     </div>
@@ -464,8 +486,8 @@ export default function Workers() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => openEdit(w)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 text-slate-800 bg-slate-50 rounded-lg hover:bg-slate-100"
+                      onClick={() => openEdit(w)} disabled={!allowManageStaff}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 text-slate-800 bg-slate-50 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <KeyRound className="w-4 h-4" />
                       Изменить
@@ -473,8 +495,8 @@ export default function Workers() {
                     {w.status === 'active' ? (
                       <button
                         type="button"
-                        onClick={() => setPending({ type: 'deactivate', worker: w })}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-900 bg-amber-50 rounded-lg hover:bg-amber-100"
+                        onClick={() => setPending({ type: 'deactivate', worker: w })} disabled={!allowManageStaff}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-900 bg-amber-50 rounded-lg hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <UserX className="w-4 h-4" />
                         {t("workers.deactivate")}
@@ -482,8 +504,8 @@ export default function Workers() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setPending({ type: 'activate', worker: w })}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-emerald-200 text-emerald-900 bg-emerald-50 rounded-lg hover:bg-emerald-100"
+                        onClick={() => setPending({ type: 'activate', worker: w })} disabled={!allowManageStaff}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-emerald-200 text-emerald-900 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <UserCheck className="w-4 h-4" />
                         {t("workers.activate")}
@@ -491,8 +513,8 @@ export default function Workers() {
                     )}
                     <button
                       type="button"
-                      onClick={() => setPending({ type: 'delete', worker: w })}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-800 bg-red-50 rounded-lg hover:bg-red-100"
+                      onClick={() => setPending({ type: 'delete', worker: w })} disabled={!allowManageStaff}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-800 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-4 h-4" />
                       {t("common.delete")}

@@ -10,7 +10,7 @@ import Clients from "./pages/Clients";
 import DebtDetail from "./pages/DebtDetail";
 import Workers from "./pages/Workers";
 import Layout from "./components/Layout";
-import { DirectorOnly, DirectorOrWorker, RoleHomeRedirect } from "./components/RoleGate";
+import { DirectorOnly, DirectorOrWorker, RoleHomeRedirect, StaffManagerOnly } from "./components/RoleGate";
 import { useAuth } from "./context/AuthContext";
 
 function ProtectedLayout() {
@@ -80,9 +80,9 @@ export const router = createBrowserRouter([
       {
         path: "workers",
         element: (
-          <DirectorOnly>
+          <StaffManagerOnly>
             <Workers />
-          </DirectorOnly>
+          </StaffManagerOnly>
         ),
       },
       {

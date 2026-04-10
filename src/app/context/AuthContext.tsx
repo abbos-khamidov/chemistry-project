@@ -34,6 +34,7 @@ export type CreateStaffInput = CreateWorkerInput & {
     addProducts?: boolean;
     editProducts?: boolean;
     issueDebt?: boolean;
+    manageStaff?: boolean;
   };
 };
 
@@ -89,6 +90,7 @@ function normalizeStored(a: unknown): StoredAccount {
             addProducts: Boolean((x.permissions as any).addProducts),
             editProducts: Boolean((x.permissions as any).editProducts),
             issueDebt: Boolean((x.permissions as any).issueDebt),
+            manageStaff: Boolean((x.permissions as any).manageStaff),
           }
         : undefined,
     password: String(x.password ?? ''),
@@ -167,6 +169,13 @@ function findAccount(accounts: StoredAccount[], login: string): StoredAccount | 
 function stripPassword(u: StoredAccount): User {
   const { password: _p, ...rest } = u;
   return rest;
+}
+
+function canManageStaffByRole(user: User | null): boolean {
+  if (!user) return false;
+  if (user.role === 'director') return true;
+  if (user.role === 'assistant') return Boolean(user.permissions?.manageStaff);
+  return false;
 }
 
 function readInitialSessionUserId(): string | null {
@@ -283,8 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setWorkerStatus = useCallback(
     (director: User | null, workerId: string, status: 'active' | 'inactive'): AuthResult => {
-      if (!director || director.role !== 'director') {
-        return { ok: false, error: 'Статус меняет только директор' };
+      if (!canManageStaffByRole(director)) {
+        return { ok: false, error: 'Недостаточно прав для изменения статуса' };
       }
       const list = loadAccounts();
       const idx = list.findIndex((a) => a.id === workerId);
@@ -301,8 +310,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteWorkerAccount = useCallback((director: User | null, workerId: string): AuthResult => {
-    if (!director || director.role !== 'director') {
-      return { ok: false, error: 'Удалять учётные записи может только директор' };
+    if (!canManageStaffByRole(director)) {
+      return { ok: false, error: 'Недостаточно прав для удаления учётных записей' };
     }
     if (director.id === workerId) {
       return { ok: false, error: 'Нельзя удалить свою учётную запись' };
@@ -320,8 +329,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createWorkerAccount = useCallback(
     (director: User | null, input: CreateWorkerInput): AuthResult => {
-      if (!director || director.role !== 'director') {
-        return { ok: false, error: 'Учётные записи создаёт только директор' };
+      if (!canManageStaffByRole(director)) {
+        return { ok: false, error: 'Недостаточно прав для создания учётных записей' };
       }
       const uname = input.username.trim().toLowerCase();
       if (!USERNAME_RE.test(uname)) {
@@ -359,8 +368,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createStaffAccount = useCallback(
     (director: User | null, input: CreateStaffInput): AuthResult => {
-      if (!director || director.role !== 'director') {
-        return { ok: false, error: 'Учётные записи создаёт только директор' };
+      if (!canManageStaffByRole(director)) {
+        return { ok: false, error: 'Недостаточно прав для создания учётных записей' };
       }
       const uname = input.username.trim().toLowerCase();
       if (!USERNAME_RE.test(uname)) {
@@ -391,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 addProducts: Boolean(input.permissions?.addProducts),
                 editProducts: Boolean(input.permissions?.editProducts),
                 issueDebt: Boolean(input.permissions?.issueDebt),
+                manageStaff: Boolean(input.permissions?.manageStaff),
               }
             : undefined,
         status: 'active',
@@ -407,8 +417,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setStaffPermissionsByDirector = useCallback(
     (director: User | null, staffId: string, permissions: NonNullable<User['permissions']>): AuthResult => {
-      if (!director || director.role !== 'director') {
-        return { ok: false, error: 'Права меняет только директор' };
+      if (!canManageStaffByRole(director)) {
+        return { ok: false, error: 'Недостаточно прав для изменения разрешений' };
       }
       const list = loadAccounts();
       const idx = list.findIndex((a) => a.id === staffId);
@@ -424,6 +434,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           addProducts: Boolean(permissions.addProducts),
           editProducts: Boolean(permissions.editProducts),
           issueDebt: Boolean(permissions.issueDebt),
+          manageStaff: Boolean(permissions.manageStaff),
         },
       };
       saveAccounts(next);
@@ -555,8 +566,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateStaffAccountByDirector = useCallback(
     (director: User | null, staffId: string, input: UpdateStaffByDirectorInput): AuthResult => {
-      if (!director || director.role !== 'director') {
-        return { ok: false, error: 'Менять учётные записи может только директор' };
+      if (!canManageStaffByRole(director)) {
+        return { ok: false, error: 'Недостаточно прав для изменения учётных записей' };
       }
       const list = loadAccounts();
       const idx = list.findIndex((a) => a.id === staffId);
@@ -601,6 +612,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           addProducts: Boolean(input.permissions?.addProducts ?? nextAcc.permissions?.addProducts),
           editProducts: Boolean(input.permissions?.editProducts ?? nextAcc.permissions?.editProducts),
           issueDebt: Boolean(input.permissions?.issueDebt ?? nextAcc.permissions?.issueDebt),
+          manageStaff: Boolean(input.permissions?.manageStaff ?? nextAcc.permissions?.manageStaff),
         };
       } else {
         nextAcc.permissions = undefined;

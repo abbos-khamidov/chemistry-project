@@ -60,6 +60,9 @@ export default function Layout() {
       if (perms.analytics) {
         nav.unshift({ nameKey: 'layout.navAnalytics', href: '/analytics', icon: BarChart3 });
       }
+      if (perms.manageStaff) {
+        nav.push({ nameKey: 'layout.navWorkers', href: '/workers', icon: Users });
+      }
       return nav;
     }
     return [
@@ -67,7 +70,7 @@ export default function Layout() {
       { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
       { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
     ];
-  }, [currentUser.role, perms.analytics]);
+  }, [currentUser.role, perms.analytics, perms.manageStaff]);
 
 
   const handleLogout = () => {

@@ -357,7 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status: 'active',
       lastActivity: new Date().toISOString().slice(0, 16).replace('T', ' '),
       password: input.password,
-      permissions: { viewDebts: true },
+      permissions: { addProducts: true, editProducts: true, issueDebt: true, viewDebts: true },
     };
     const next = [...list, acc];
     await upsertAccountsToDb(next);
@@ -401,6 +401,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               viewDebts: Boolean(input.permissions?.viewDebts ?? true),
             }
           : {
+              analytics: Boolean(input.permissions?.analytics),
+              addProducts: Boolean(input.permissions?.addProducts ?? true),
+              editProducts: Boolean(input.permissions?.editProducts ?? true),
+              issueDebt: Boolean(input.permissions?.issueDebt ?? true),
               viewDebts: Boolean(input.permissions?.viewDebts ?? true),
             },
       status: 'active',
@@ -629,6 +633,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     } else {
       nextAcc.permissions = {
+        analytics: Boolean(input.permissions?.analytics ?? nextAcc.permissions?.analytics),
+        addProducts: Boolean(input.permissions?.addProducts ?? nextAcc.permissions?.addProducts ?? true),
+        editProducts: Boolean(input.permissions?.editProducts ?? nextAcc.permissions?.editProducts ?? true),
+        issueDebt: Boolean(input.permissions?.issueDebt ?? nextAcc.permissions?.issueDebt ?? true),
         viewDebts: Boolean(input.permissions?.viewDebts ?? nextAcc.permissions?.viewDebts ?? true),
       };
     }

@@ -27,7 +27,14 @@ export function getPermissions(user: User | null): AppPermissions {
     };
   }
   // worker
-  return { analytics: false, addProducts: false, editProducts: false, issueDebt: true, manageStaff: false, viewDebts: Boolean(user.permissions?.viewDebts ?? true) };
+  return {
+    analytics: Boolean(user.permissions?.analytics),
+    addProducts: Boolean(user.permissions?.addProducts ?? true),
+    editProducts: Boolean(user.permissions?.editProducts ?? true),
+    issueDebt: Boolean(user.permissions?.issueDebt ?? true),
+    manageStaff: false,
+    viewDebts: Boolean(user.permissions?.viewDebts ?? true),
+  };
 }
 
 export function canViewAnalytics(user: User | null): boolean {

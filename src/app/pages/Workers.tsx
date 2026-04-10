@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { UserPlus, Copy, Users, UserX, Trash2, UserCheck, KeyRound } from 'lucide-react';
 import type { User } from '../data/mockData';
@@ -23,9 +23,9 @@ export default function Workers() {
   const [password, setPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'worker' | 'assistant'>('worker');
   const [permAnalytics, setPermAnalytics] = useState(false);
-  const [permAddProducts, setPermAddProducts] = useState(false);
-  const [permEditProducts, setPermEditProducts] = useState(false);
-  const [permIssueDebt, setPermIssueDebt] = useState(false);
+  const [permAddProducts, setPermAddProducts] = useState(true);
+  const [permEditProducts, setPermEditProducts] = useState(true);
+  const [permIssueDebt, setPermIssueDebt] = useState(true);
   const [permManageStaff, setPermManageStaff] = useState(false);
   const [permViewDebts, setPermViewDebts] = useState(true);
 
@@ -45,6 +45,20 @@ export default function Workers() {
   const [editPassword, setEditPassword] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
+  useEffect(() => {
+    if (staffRole !== 'worker') return;
+    setPermAddProducts(true);
+    setPermEditProducts(true);
+    setPermIssueDebt(true);
+  }, [staffRole]);
+
+  useEffect(() => {
+    if (editRole !== 'worker') return;
+    setEditPermAddProducts(true);
+    setEditPermEditProducts(true);
+    setEditPermIssueDebt(true);
+  }, [editRole]);
+
   const sortedWorkers = [...workers].sort((a, b) => {
     if (a.status === b.status) return a.fullName.localeCompare(b.fullName, 'ru');
     return a.status === 'active' ? -1 : 1;
@@ -56,9 +70,9 @@ export default function Workers() {
     setEditPhone(w.phone);
     setEditRole(w.role === 'assistant' ? 'assistant' : 'worker');
     setEditPermAnalytics(Boolean(w.permissions?.analytics));
-    setEditPermAddProducts(Boolean(w.permissions?.addProducts));
-    setEditPermEditProducts(Boolean(w.permissions?.editProducts));
-    setEditPermIssueDebt(Boolean(w.permissions?.issueDebt));
+    setEditPermAddProducts(Boolean(w.permissions?.addProducts ?? (w.role === 'worker')));
+    setEditPermEditProducts(Boolean(w.permissions?.editProducts ?? (w.role === 'worker')));
+    setEditPermIssueDebt(Boolean(w.permissions?.issueDebt ?? (w.role === 'worker')));
     setEditPermManageStaff(Boolean(w.permissions?.manageStaff));
     setEditPermViewDebts(Boolean(w.permissions?.viewDebts ?? true));
     setEditUsername(w.username);
@@ -106,6 +120,10 @@ export default function Workers() {
               viewDebts: editPermViewDebts,
             }
           : {
+              analytics: editPermAnalytics,
+              addProducts: editPermAddProducts,
+              editProducts: editPermEditProducts,
+              issueDebt: editPermIssueDebt,
               viewDebts: editPermViewDebts,
             },
     };
@@ -147,6 +165,10 @@ export default function Workers() {
         manageStaff: permManageStaff,
         viewDebts: permViewDebts,
       } : {
+        analytics: permAnalytics,
+        addProducts: permAddProducts,
+        editProducts: permEditProducts,
+        issueDebt: permIssueDebt,
         viewDebts: permViewDebts,
       },
 
@@ -177,9 +199,9 @@ export default function Workers() {
     setPassword('');
     setStaffRole('worker');
     setPermAnalytics(false);
-    setPermAddProducts(false);
-    setPermEditProducts(false);
-    setPermIssueDebt(false);
+    setPermAddProducts(true);
+    setPermEditProducts(true);
+    setPermIssueDebt(true);
     setPermManageStaff(false);
     setPermViewDebts(true);
   };
@@ -550,10 +572,10 @@ export default function Workers() {
                       </span>
                       {(w.role === 'assistant' || w.role === 'worker') && (
                         <>
-                          {w.role === 'assistant' && w.permissions?.analytics && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Аналитика</span>}
-                          {w.role === 'assistant' && w.permissions?.addProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Добавлять товары</span>}
-                          {w.role === 'assistant' && w.permissions?.editProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
-                          {w.role === 'assistant' && w.permissions?.issueDebt && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
+                          {w.permissions?.analytics && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Аналитика</span>}
+                          {(w.permissions?.addProducts ?? (w.role === 'worker')) && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Добавлять товары</span>}
+                          {(w.permissions?.editProducts ?? (w.role === 'worker')) && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
+                          {(w.permissions?.issueDebt ?? (w.role === 'worker')) && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
                           {w.role === 'assistant' && w.permissions?.manageStaff && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Сотрудники</span>}
                           {w.permissions?.viewDebts !== false && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Должники</span>}
                         </>

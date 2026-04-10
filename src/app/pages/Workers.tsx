@@ -27,6 +27,7 @@ export default function Workers() {
   const [permEditProducts, setPermEditProducts] = useState(false);
   const [permIssueDebt, setPermIssueDebt] = useState(false);
   const [permManageStaff, setPermManageStaff] = useState(false);
+  const [permViewDebts, setPermViewDebts] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
@@ -39,6 +40,7 @@ export default function Workers() {
   const [editPermEditProducts, setEditPermEditProducts] = useState(false);
   const [editPermIssueDebt, setEditPermIssueDebt] = useState(false);
   const [editPermManageStaff, setEditPermManageStaff] = useState(false);
+  const [editPermViewDebts, setEditPermViewDebts] = useState(true);
   const [editUsername, setEditUsername] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editSaving, setEditSaving] = useState(false);
@@ -58,6 +60,7 @@ export default function Workers() {
     setEditPermEditProducts(Boolean(w.permissions?.editProducts));
     setEditPermIssueDebt(Boolean(w.permissions?.issueDebt));
     setEditPermManageStaff(Boolean(w.permissions?.manageStaff));
+    setEditPermViewDebts(Boolean(w.permissions?.viewDebts ?? true));
     setEditUsername(w.username);
     setEditPassword('');
   };
@@ -72,6 +75,7 @@ export default function Workers() {
     setEditPermEditProducts(false);
     setEditPermIssueDebt(false);
     setEditPermManageStaff(false);
+    setEditPermViewDebts(true);
     setEditUsername('');
     setEditPassword('');
   };
@@ -99,8 +103,11 @@ export default function Workers() {
               editProducts: editPermEditProducts,
               issueDebt: editPermIssueDebt,
               manageStaff: editPermManageStaff,
+              viewDebts: editPermViewDebts,
             }
-          : undefined,
+          : {
+              viewDebts: editPermViewDebts,
+            },
     };
 
     setEditSaving(true);
@@ -138,7 +145,10 @@ export default function Workers() {
         editProducts: permEditProducts,
         issueDebt: permIssueDebt,
         manageStaff: permManageStaff,
-      } : undefined,
+        viewDebts: permViewDebts,
+      } : {
+        viewDebts: permViewDebts,
+      },
 
       fullName,
       phone,
@@ -171,6 +181,7 @@ export default function Workers() {
     setPermEditProducts(false);
     setPermIssueDebt(false);
     setPermManageStaff(false);
+    setPermViewDebts(true);
   };
 
   const copyCreds = () => {
@@ -298,9 +309,9 @@ export default function Workers() {
                   <option value="assistant">Ассистент директора</option>
                 </select>
               </div>
-              {editRole === 'assistant' && (
+              {(editRole === 'assistant' || editRole === 'worker') && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
-                  <p className="text-sm font-semibold text-slate-900">Права ассистента</p>
+                  <p className="text-sm font-semibold text-slate-900">{editRole === 'assistant' ? 'Права ассистента' : 'Права рабочего'}</p>
                   <label className="flex items-center gap-3 text-sm text-slate-800">
                     <input type="checkbox" checked={editPermAnalytics} onChange={(e) => setEditPermAnalytics(e.target.checked)} />
                     Возможность аналитики
@@ -317,9 +328,15 @@ export default function Workers() {
                     <input type="checkbox" checked={editPermIssueDebt} onChange={(e) => setEditPermIssueDebt(e.target.checked)} />
                     Выдавать товар в долг
                   </label>
+                  {editRole === 'assistant' && (
+                    <label className="flex items-center gap-3 text-sm text-slate-800">
+                      <input type="checkbox" checked={editPermManageStaff} onChange={(e) => setEditPermManageStaff(e.target.checked)} />
+                      Управление сотрудниками (добавлять, редактировать, отключать)
+                    </label>
+                  )}
                   <label className="flex items-center gap-3 text-sm text-slate-800">
-                    <input type="checkbox" checked={editPermManageStaff} onChange={(e) => setEditPermManageStaff(e.target.checked)} />
-                    Управление сотрудниками (добавлять, редактировать, отключать)
+                    <input type="checkbox" checked={editPermViewDebts} onChange={(e) => setEditPermViewDebts(e.target.checked)} />
+                    Видимость должников
                   </label>
                 </div>
               )}
@@ -436,9 +453,9 @@ export default function Workers() {
               </select>
             </div>
 
-            {staffRole === 'assistant' && (
+            {(staffRole === 'assistant' || staffRole === 'worker') && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Права ассистента</p>
+                <p className="text-sm font-semibold text-slate-900">{staffRole === 'assistant' ? 'Права ассистента' : 'Права рабочего'}</p>
                 <label className="flex items-center gap-3 text-sm text-slate-800">
                   <input type="checkbox" checked={permAnalytics} onChange={(e) => setPermAnalytics(e.target.checked)} />
                   Возможность аналитики
@@ -455,9 +472,15 @@ export default function Workers() {
                   <input type="checkbox" checked={permIssueDebt} onChange={(e) => setPermIssueDebt(e.target.checked)} />
                   Выдавать товар в долг
                 </label>
+                {staffRole === 'assistant' && (
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={permManageStaff} onChange={(e) => setPermManageStaff(e.target.checked)} />
+                    Управление сотрудниками (добавлять, редактировать, отключать)
+                  </label>
+                )}
                 <label className="flex items-center gap-3 text-sm text-slate-800">
-                  <input type="checkbox" checked={permManageStaff} onChange={(e) => setPermManageStaff(e.target.checked)} />
-                  Управление сотрудниками (добавлять, редактировать, отключать)
+                  <input type="checkbox" checked={permViewDebts} onChange={(e) => setPermViewDebts(e.target.checked)} />
+                  Видимость должников
                 </label>
               </div>
             )}
@@ -525,13 +548,14 @@ export default function Workers() {
                       <span className={`text-xs px-2 py-1 rounded-full ${w.role === 'assistant' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
                         {w.role === 'assistant' ? 'Ассистент директора' : 'Рабочий'}
                       </span>
-                      {w.role === 'assistant' && (
+                      {(w.role === 'assistant' || w.role === 'worker') && (
                         <>
-                          {w.permissions?.analytics && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Аналитика</span>}
-                          {w.permissions?.addProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Добавлять товары</span>}
-                          {w.permissions?.editProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
-                          {w.permissions?.issueDebt && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
-                          {w.permissions?.manageStaff && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Сотрудники</span>}
+                          {w.role === 'assistant' && w.permissions?.analytics && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Аналитика</span>}
+                          {w.role === 'assistant' && w.permissions?.addProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Добавлять товары</span>}
+                          {w.role === 'assistant' && w.permissions?.editProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
+                          {w.role === 'assistant' && w.permissions?.issueDebt && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
+                          {w.role === 'assistant' && w.permissions?.manageStaff && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Сотрудники</span>}
+                          {w.permissions?.viewDebts !== false && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Должники</span>}
                         </>
                       )}
                     </div>

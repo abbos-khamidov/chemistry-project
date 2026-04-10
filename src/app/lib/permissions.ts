@@ -6,14 +6,15 @@ export type AppPermissions = {
   editProducts: boolean;
   issueDebt: boolean;
   manageStaff: boolean;
+  viewDebts: boolean;
 };
 
 export function getPermissions(user: User | null): AppPermissions {
   if (!user) {
-    return { analytics: false, addProducts: false, editProducts: false, issueDebt: false, manageStaff: false };
+    return { analytics: false, addProducts: false, editProducts: false, issueDebt: false, manageStaff: false, viewDebts: false };
   }
   if (user.role === 'director') {
-    return { analytics: true, addProducts: true, editProducts: true, issueDebt: true, manageStaff: true };
+    return { analytics: true, addProducts: true, editProducts: true, issueDebt: true, manageStaff: true, viewDebts: true };
   }
   if (user.role === 'assistant') {
     return {
@@ -22,10 +23,11 @@ export function getPermissions(user: User | null): AppPermissions {
       editProducts: Boolean(user.permissions?.editProducts),
       issueDebt: Boolean(user.permissions?.issueDebt),
       manageStaff: Boolean(user.permissions?.manageStaff),
+      viewDebts: Boolean(user.permissions?.viewDebts ?? true),
     };
   }
   // worker
-  return { analytics: false, addProducts: false, editProducts: false, issueDebt: true, manageStaff: false };
+  return { analytics: false, addProducts: false, editProducts: false, issueDebt: true, manageStaff: false, viewDebts: Boolean(user.permissions?.viewDebts ?? true) };
 }
 
 export function canViewAnalytics(user: User | null): boolean {
@@ -47,4 +49,9 @@ export function canIssueDebt(user: User | null): boolean {
 
 export function canManageStaff(user: User | null): boolean {
   return getPermissions(user).manageStaff;
+}
+
+
+export function canViewDebts(user: User | null): boolean {
+  return getPermissions(user).viewDebts;
 }

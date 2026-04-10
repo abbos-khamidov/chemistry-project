@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router';
 import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { canManageStaff, canViewAnalytics } from '../lib/permissions';
+import { canManageStaff, canViewAnalytics, canViewDebts } from '../lib/permissions';
 
 /** Только директор: аналитика, аудит, KPI. */
 export function DirectorOnly({ children }: { children: ReactNode }) {
@@ -40,5 +40,14 @@ export function StaffManagerOnly({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (!canManageStaff(user)) return <Navigate to="/products" replace />;
+  return <>{children}</>;
+}
+
+
+export function DebtsVisibleOnly({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'director' && user.role !== 'worker' && user.role !== 'assistant') return <Navigate to="/login" replace />;
+  if (!canViewDebts(user)) return <Navigate to="/products" replace />;
   return <>{children}</>;
 }

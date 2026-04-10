@@ -55,22 +55,27 @@ export default function Layout() {
       const nav = [
         { nameKey: 'layout.navProducts', href: '/products', icon: Package },
         { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
-        { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
       ];
       if (perms.analytics) {
         nav.unshift({ nameKey: 'layout.navAnalytics', href: '/analytics', icon: BarChart3 });
+      }
+      if (perms.viewDebts) {
+        nav.push({ nameKey: 'layout.navDebts', href: '/debts', icon: Wallet });
       }
       if (perms.manageStaff) {
         nav.push({ nameKey: 'layout.navWorkers', href: '/workers', icon: Users });
       }
       return nav;
     }
-    return [
+    const nav = [
       { nameKey: 'layout.navProducts', href: '/products', icon: Package },
       { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
-      { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
     ];
-  }, [currentUser.role, perms.analytics, perms.manageStaff]);
+    if (perms.viewDebts) {
+      nav.push({ nameKey: 'layout.navDebts', href: '/debts', icon: Wallet });
+    }
+    return nav;
+  }, [currentUser.role, perms.analytics, perms.manageStaff, perms.viewDebts]);
 
 
   const handleLogout = () => {
@@ -110,10 +115,12 @@ export default function Layout() {
       }
     }
 
-    for (const d of debts) {
-      const blob = [d.fullName, d.phone, d.company ?? ''].join(' ').toLowerCase();
-      if (blob.includes(q)) {
-        out.push({ key: `d:${d.id}`, title: d.fullName, subtitle: t('layout.navDebts'), to: `/debts/${d.id}` });
+    if (perms.viewDebts) {
+      for (const d of debts) {
+        const blob = [d.fullName, d.phone, d.company ?? ''].join(' ').toLowerCase();
+        if (blob.includes(q)) {
+          out.push({ key: `d:${d.id}`, title: d.fullName, subtitle: t('layout.navDebts'), to: `/debts/${d.id}` });
+        }
       }
     }
 
@@ -133,7 +140,7 @@ export default function Layout() {
       if (uniq.length >= 10) break;
     }
     return uniq;
-  }, [searchQuery, navigation, products, debts, clientSales, locale, t]);
+  }, [searchQuery, navigation, products, debts, clientSales, locale, t, perms.viewDebts]);
 
   const mobileCols =
     navigation.length >= 7

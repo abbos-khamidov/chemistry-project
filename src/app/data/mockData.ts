@@ -109,6 +109,7 @@ export interface User {
     editProducts?: boolean;
     issueDebt?: boolean;
     manageStaff?: boolean;
+    viewDebts?: boolean;
   };
   status: 'active' | 'inactive';
   lastActivity: string;

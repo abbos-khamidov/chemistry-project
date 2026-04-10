@@ -35,6 +35,7 @@ export type CreateStaffInput = CreateWorkerInput & {
     editProducts?: boolean;
     issueDebt?: boolean;
     manageStaff?: boolean;
+    viewDebts?: boolean;
   };
 };
 
@@ -91,6 +92,7 @@ function normalizeStored(a: unknown): StoredAccount {
             editProducts: Boolean((x.permissions as any).editProducts),
             issueDebt: Boolean((x.permissions as any).issueDebt),
             manageStaff: Boolean((x.permissions as any).manageStaff),
+            viewDebts: Boolean((x.permissions as any).viewDebts ?? true),
           }
         : undefined,
     password: String(x.password ?? ''),
@@ -407,6 +409,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 editProducts: Boolean(input.permissions?.editProducts),
                 issueDebt: Boolean(input.permissions?.issueDebt),
                 manageStaff: Boolean(input.permissions?.manageStaff),
+                viewDebts: Boolean(input.permissions?.viewDebts ?? true),
               }
             : undefined,
         status: 'active',
@@ -441,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           editProducts: Boolean(permissions.editProducts),
           issueDebt: Boolean(permissions.issueDebt),
           manageStaff: Boolean(permissions.manageStaff),
+          viewDebts: Boolean(permissions.viewDebts ?? true),
         },
       };
       saveAccounts(next);
@@ -643,9 +647,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           editProducts: Boolean(input.permissions?.editProducts ?? nextAcc.permissions?.editProducts),
           issueDebt: Boolean(input.permissions?.issueDebt ?? nextAcc.permissions?.issueDebt),
           manageStaff: Boolean(input.permissions?.manageStaff ?? nextAcc.permissions?.manageStaff),
+          viewDebts: Boolean(input.permissions?.viewDebts ?? nextAcc.permissions?.viewDebts ?? true),
         };
       } else {
-        nextAcc.permissions = undefined;
+        nextAcc.permissions = {
+          viewDebts: Boolean(input.permissions?.viewDebts ?? nextAcc.permissions?.viewDebts ?? true),
+        };
       }
 
       const next = [...list];

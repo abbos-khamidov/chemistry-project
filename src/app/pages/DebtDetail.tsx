@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
+import { canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { debtLineProductName } from '../lib/productLocale';
 
@@ -28,6 +29,7 @@ export default function DebtDetail() {
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === 'director';
+  const canManageDebt = isDirector || canIssueDebt(user);
   const debt = debts.find((d) => d.id === id);
 
   const [payOpen, setPayOpen] = useState(false);
@@ -107,7 +109,7 @@ export default function DebtDetail() {
 
   const submitPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !isDirector) return;
+    if (!id || !canManageDebt) return;
     const amt = paymentMode === 'full' ? debt.remainingAmount : Number(amountPay);
     const result = applyDebtPayment(id, {
       personName: debt.fullName.trim(),
@@ -122,7 +124,7 @@ export default function DebtDetail() {
     }
     appendAudit({
       userName: user?.fullName ?? '—',
-      userRole: 'director',
+      userRole: (user?.role as any) ?? 'director',
       action: 'Оплата',
       entity: 'Долг',
       details: `${debt.fullName}: ${amt.toLocaleString()} UZS`,
@@ -145,7 +147,7 @@ export default function DebtDetail() {
           <ArrowLeft className="w-5 h-5" />
           <span>К списку должников</span>
         </Link>
-        {!isDirector && (
+        {!canManageDebt && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             Режим просмотра: оплату и изменения вносит директор. Оформление долга выполняется один раз при создании записи.
           </div>
@@ -170,7 +172,7 @@ export default function DebtDetail() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isDirector && debt.status !== 'paid' && (
+            {canManageDebt && debt.status !== 'paid' && (
               <button
                 type="button"
                 onClick={() => setPayOpen(true)}
@@ -180,7 +182,7 @@ export default function DebtDetail() {
                 <span>Записать оплату</span>
               </button>
             )}
-            {isDirector && (
+            {canManageDebt && (
               <>
                 <button
                   type="button"

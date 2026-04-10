@@ -31,7 +31,7 @@ export function NotificationsPopover() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="relative p-2 hover:bg-slate-100 rounded-lg text-slate-600"
+        className="relative p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300"
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={t('notifications.title')}
@@ -46,16 +46,16 @@ export function NotificationsPopover() {
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 w-[min(calc(100vw-2rem),22rem)] max-h-[min(70vh,28rem)] overflow-hidden flex flex-col rounded-xl border border-slate-200 bg-white shadow-lg"
+          className="absolute right-0 top-full mt-1 z-50 w-[min(calc(100vw-2rem),22rem)] max-h-[min(70vh,28rem)] overflow-hidden flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
           role="dialog"
         >
-          <div className="px-4 py-3 border-b border-slate-100">
-            <p className="font-semibold text-slate-900 text-sm">{t('notifications.title')}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{t('notifications.subtitle')}</p>
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+            <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{t('notifications.title')}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('notifications.subtitle')}</p>
           </div>
           <div className="overflow-y-auto flex-1 p-2">
             {rows.length === 0 ? (
-              <p className="text-sm text-slate-500 px-2 py-6 text-center">{t('notifications.empty')}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 px-2 py-6 text-center">{t('notifications.empty')}</p>
             ) : (
               <ul className="space-y-1">
                 {rows.map((r) => {
@@ -64,27 +64,27 @@ export function NotificationsPopover() {
                     <li
                       key={r.id}
                       className={`rounded-lg border text-left p-3 text-sm ${
-                        read ? 'border-slate-100 bg-white' : 'border-amber-100 bg-amber-50/60'
+                        read ? 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900' : 'border-amber-100 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/20'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] text-slate-500 tabular-nums">{r.at}</p>
-                          <p className="font-medium text-slate-900 mt-0.5">{r.userName}</p>
-                          <p className="text-xs text-slate-600 mt-1">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">{r.at}</p>
+                          <p className="font-medium text-slate-900 dark:text-slate-100 mt-0.5">{r.userName}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                             <span className="font-medium">{r.action}</span>
-                            <span className="text-slate-400"> · </span>
+                            <span className="text-slate-400 dark:text-slate-500"> · </span>
                             <span>{r.entity}</span>
                           </p>
                           {r.details ? (
-                            <p className="text-xs text-slate-600 mt-1.5 break-words">{r.details}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 break-words">{r.details}</p>
                           ) : null}
                         </div>
                         {!read && (
                           <button
                             type="button"
                             onClick={() => markAuditRead(r.id)}
-                            className="shrink-0 text-xs font-medium text-slate-700 px-2 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50"
+                            className="shrink-0 text-xs font-medium text-slate-700 dark:text-slate-200 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
                           >
                             {t('notifications.markRead')}
                           </button>

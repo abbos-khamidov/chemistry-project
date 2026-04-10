@@ -50,20 +50,24 @@ export default function Analytics() {
         if (dateInRange(h.date, startDate, endDate)) operationsInRange++;
       }
     }
-    let collectedInRange = 0;
+    let collectedDebtInRange = 0;
     for (const d of debts) {
       for (const ph of d.paymentHistory) {
-        if (dateInRange(ph.date, startDate, endDate)) collectedInRange += ph.amount;
+        if (dateInRange(ph.date, startDate, endDate)) collectedDebtInRange += ph.amount;
       }
     }
+    let collectedSalesInRange = 0;
     for (const sale of clientSales ?? []) {
-      if (dateInRange(sale.date, startDate, endDate)) collectedInRange += sale.amountUzs;
+      if (dateInRange(sale.date, startDate, endDate)) collectedSalesInRange += sale.amountUzs;
     }
+    const collectedInRange = collectedDebtInRange + collectedSalesInRange;
     const overdueDebts = debts.filter((d) => d.status === 'overdue').length;
     return {
       totalWarehouseValue,
       totalDebtsRemaining,
       collectedInRange,
+      collectedDebtInRange,
+      collectedSalesInRange,
       operationsInRange,
       overdueDebts,
     };
@@ -273,6 +277,34 @@ export default function Analytics() {
           )}
         </div>
 
+        <div className="bg-white rounded-xl border border-slate-200/80 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-slate-900">{t('analytics.chartCollectionsBreakdown')}</h3>
+            <span className="text-xs text-slate-600">{t('analytics.chartCollectionsBreakdownHint')}</span>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsBar
+              data={[
+                {
+                  month: t('analytics.periodLabel'),
+                  debtPayments: stats.collectedDebtInRange,
+                  directSales: stats.collectedSalesInRange,
+                },
+              ]}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+              <YAxis stroke="#64748b" fontSize={12} />
+              <Tooltip
+                formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
+                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+              />
+              <Legend />
+              <Bar dataKey="debtPayments" fill="#10b981" radius={[8, 8, 0, 0]} name={t('analytics.seriesDebtPayments')} />
+              <Bar dataKey="directSales" fill="#3b82f6" radius={[8, 8, 0, 0]} name={t('analytics.seriesDirectSales')} />
+            </RechartsBar>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

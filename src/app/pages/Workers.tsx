@@ -11,7 +11,7 @@ type PendingAction =
   | { type: 'deactivate' | 'activate' | 'delete'; worker: User };
 
 export default function Workers() {
-  const { user, workers, createStaffAccount, setWorkerStatus, setStaffPermissionsByDirector, deleteWorkerAccount, updateWorkerCredentialsByDirector } =
+  const { user, workers, createStaffAccount, setWorkerStatus, setStaffPermissionsByDirector, deleteWorkerAccount, updateStaffAccountByDirector } =
     useAuth();
   const { appendAudit } = useWarehouse();
   const { t } = useI18n();
@@ -28,6 +28,13 @@ export default function Workers() {
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
   const [editWorker, setEditWorker] = useState<User | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editRole, setEditRole] = useState<'worker' | 'assistant'>('worker');
+  const [editPermAnalytics, setEditPermAnalytics] = useState(false);
+  const [editPermAddProducts, setEditPermAddProducts] = useState(false);
+  const [editPermEditProducts, setEditPermEditProducts] = useState(false);
+  const [editPermIssueDebt, setEditPermIssueDebt] = useState(false);
   const [editUsername, setEditUsername] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editSaving, setEditSaving] = useState(false);
@@ -39,12 +46,26 @@ export default function Workers() {
 
   const openEdit = (w: User) => {
     setEditWorker(w);
+    setEditFullName(w.fullName);
+    setEditPhone(w.phone);
+    setEditRole(w.role === 'assistant' ? 'assistant' : 'worker');
+    setEditPermAnalytics(Boolean(w.permissions?.analytics));
+    setEditPermAddProducts(Boolean(w.permissions?.addProducts));
+    setEditPermEditProducts(Boolean(w.permissions?.editProducts));
+    setEditPermIssueDebt(Boolean(w.permissions?.issueDebt));
     setEditUsername(w.username);
     setEditPassword('');
   };
 
   const closeEdit = () => {
     setEditWorker(null);
+    setEditFullName('');
+    setEditPhone('');
+    setEditRole('worker');
+    setEditPermAnalytics(false);
+    setEditPermAddProducts(false);
+    setEditPermEditProducts(false);
+    setEditPermIssueDebt(false);
     setEditUsername('');
     setEditPassword('');
   };
@@ -52,33 +73,39 @@ export default function Workers() {
   const handleEditSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editWorker || !user) return;
+
     const u = editUsername.trim().toLowerCase();
-    const pwd = editPassword;
-    const usernameChanged = u !== editWorker.username.toLowerCase();
-    const passwordSet = pwd.length > 0;
-    if (!usernameChanged && !passwordSet) {
-      toast.info(t('workers.noChanges'));
-      return;
-    }
+    const payload = {
+      fullName: editFullName.trim(),
+      phone: editPhone.trim(),
+      username: u,
+      password: editPassword || undefined,
+      role: editRole,
+      permissions:
+        editRole === 'assistant'
+          ? {
+              analytics: editPermAnalytics,
+              addProducts: editPermAddProducts,
+              editProducts: editPermEditProducts,
+              issueDebt: editPermIssueDebt,
+            }
+          : undefined,
+    };
+
     setEditSaving(true);
-    const result = updateWorkerCredentialsByDirector(user, editWorker.id, {
-      username: usernameChanged ? u : undefined,
-      password: passwordSet ? pwd : undefined,
-    });
+    const result = updateStaffAccountByDirector(user, editWorker.id, payload);
     setEditSaving(false);
     if (!result.ok) {
       toast.error(result.error ?? t('workers.toastCredsFail'));
       return;
     }
-    const parts: string[] = [];
-    if (usernameChanged) parts.push(`логин → @${u}`);
-    if (passwordSet) parts.push('пароль обновлён');
+
     appendAudit({
       userName: user.fullName,
       userRole: 'director',
       action: 'Изменение',
       entity: 'Пользователь',
-      details: `Рабочий ${editWorker.fullName}: ${parts.join(', ')}`,
+      details: `Учётка обновлена: ${editFullName.trim()} (@${u}), роль: ${editRole === 'assistant' ? 'ассистент' : 'рабочий'}`,
       ip: '—',
     });
     toast.success(t('workers.toastCredsOk'));

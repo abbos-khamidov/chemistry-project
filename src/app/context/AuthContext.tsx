@@ -196,6 +196,15 @@ export type UpdateWorkerCredentialsInput = {
   password?: string;
 };
 
+export type UpdateStaffByDirectorInput = {
+  fullName?: string;
+  phone?: string;
+  username?: string;
+  password?: string;
+  role?: 'worker' | 'assistant';
+  permissions?: NonNullable<User['permissions']>;
+};
+
 type AuthContextValue = {
   user: User | null;
   workers: User[];
@@ -211,6 +220,11 @@ type AuthContextValue = {
     director: User | null,
     workerId: string,
     input: UpdateWorkerCredentialsInput,
+  ) => AuthResult;
+  updateStaffAccountByDirector: (
+    director: User | null,
+    staffId: string,
+    input: UpdateStaffByDirectorInput,
   ) => AuthResult;
 };
 
@@ -337,7 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const next = [...list, acc];
       saveAccounts(next);
       setAccounts(next);
-      return { ok: true, role: 'worker' };
+      return { ok: true, role: nextAcc.role };
     },
     []
   );
@@ -503,8 +517,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const list = loadAccounts();
       const idx = list.findIndex((a) => a.id === workerId);
-      if (idx === -1 || list[idx].role !== 'worker') {
-        return { ok: false, error: 'Рабочий не найден' };
+      if (idx === -1 || (list[idx].role !== 'worker' && list[idx].role !== 'assistant')) {
+        return { ok: false, error: 'Сотрудник не найден' };
       }
       const acc = list[idx];
       const nextAcc: StoredAccount = { ...acc };
@@ -538,6 +552,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user?.id]
   );
 
+
+  const updateStaffAccountByDirector = useCallback(
+    (director: User | null, staffId: string, input: UpdateStaffByDirectorInput): AuthResult => {
+      if (!director || director.role !== 'director') {
+        return { ok: false, error: 'Менять учётные записи может только директор' };
+      }
+      const list = loadAccounts();
+      const idx = list.findIndex((a) => a.id === staffId);
+      if (idx === -1 || (list[idx].role !== 'worker' && list[idx].role !== 'assistant')) {
+        return { ok: false, error: 'Сотрудник не найден' };
+      }
+
+      const acc = list[idx];
+      const nextAcc: StoredAccount = { ...acc };
+
+      if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
+      if (input.phone !== undefined) nextAcc.phone = input.phone.trim();
+
+      const uname = input.username?.trim().toLowerCase();
+      if (uname !== undefined && uname !== '') {
+        if (!USERNAME_RE.test(uname)) {
+          return {
+            ok: false,
+            error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+          };
+        }
+        if (list.some((a, i) => i !== idx && a.username.toLowerCase() === uname)) {
+          return { ok: false, error: 'Такой логин уже занят' };
+        }
+        nextAcc.username = uname;
+      }
+
+      if (input.password !== undefined && input.password !== '') {
+        if (input.password.length < 4) {
+          return { ok: false, error: 'Пароль не короче 4 символов' };
+        }
+        nextAcc.password = input.password;
+      }
+
+      if (input.role) {
+        nextAcc.role = input.role;
+      }
+
+      if (nextAcc.role === 'assistant') {
+        nextAcc.permissions = {
+          analytics: Boolean(input.permissions?.analytics ?? nextAcc.permissions?.analytics),
+          addProducts: Boolean(input.permissions?.addProducts ?? nextAcc.permissions?.addProducts),
+          editProducts: Boolean(input.permissions?.editProducts ?? nextAcc.permissions?.editProducts),
+          issueDebt: Boolean(input.permissions?.issueDebt ?? nextAcc.permissions?.issueDebt),
+        };
+      } else {
+        nextAcc.permissions = undefined;
+      }
+
+      const next = [...list];
+      next[idx] = nextAcc;
+      saveAccounts(next);
+      setAccounts(next);
+      if (user?.id === staffId) {
+        setUser(stripPassword(nextAcc));
+      }
+      return { ok: true, role: nextAcc.role };
+    },
+    [user?.id]
+  );
+
+
   const value = useMemo(
     () => ({
       user,
@@ -551,6 +632,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteWorkerAccount,
       updateDirectorProfile,
       updateWorkerCredentialsByDirector,
+      updateStaffAccountByDirector,
     }),
     [
       user,
@@ -564,6 +646,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteWorkerAccount,
       updateDirectorProfile,
       updateWorkerCredentialsByDirector,
+      updateStaffAccountByDirector,
     ]
   );
 

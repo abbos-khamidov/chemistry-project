@@ -20,6 +20,7 @@ import type { Debt } from '../data/mockData';
 import type { UpdateProductInput } from '../context/WarehouseContext';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
+import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
 const MAX_IMAGE_BYTES = 600 * 1024;
@@ -32,6 +33,8 @@ export default function ProductDetail() {
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === 'director';
+  const canEdit = canEditProducts(user);
+  const canDebt = canIssueDebt(user);
 
   const product = products.find((p) => p.id === id);
   const [inQty, setInQty] = useState('');
@@ -157,7 +160,7 @@ export default function ProductDetail() {
 
   const submitEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isDirector || !id) return;
+    if (!canEdit || !id) return;
     const q = Number(eQty);
     const pr = Number(ePrice);
     if (!eName.trim() || !Number.isFinite(q) || !Number.isFinite(pr)) {
@@ -220,7 +223,7 @@ export default function ProductDetail() {
 
 
   const handleDelete = () => {
-    if (!isDirector || !id) return;
+    if (!canEdit || !id) return;
     if (!window.confirm(t('products.confirmDelete').replace('{name}', productName(product, locale)))) return;
     deleteProduct(id);
     appendAudit({
@@ -282,7 +285,7 @@ export default function ProductDetail() {
       fullName: debtorName,
       phone: debtorPhone,
       company: debtorCompany,
-      createdByRole: isDirector ? 'director' : 'worker',
+      createdByRole: (user?.role as any) ?? 'worker',
       createdByUserId: user?.id,
       totalAmount: total,
       paidAmount: 0,
@@ -309,7 +312,7 @@ export default function ProductDetail() {
     }
     appendAudit({
       userName: user?.fullName ?? '—',
-      userRole: isDirector ? 'director' : 'worker',
+      userRole: (user?.role as any) ?? 'worker',
       action: 'Создание',
       entity: 'Долг',
       details: `${productName(product, locale)}, ${debtorName}, ${total.toLocaleString()} UZS`,
@@ -342,7 +345,7 @@ export default function ProductDetail() {
       phone: sPhone.trim() || undefined,
       company: sCompany.trim() || undefined,
       createdByUserId: user?.id,
-      createdByRole: isDirector ? 'director' : 'worker',
+      createdByRole: (user?.role as any) ?? 'worker',
     });
     if (!result.ok) {
       toast.error(result.error);
@@ -351,7 +354,7 @@ export default function ProductDetail() {
     const amount = qty * product.price;
     appendAudit({
       userName: user?.fullName ?? '—',
-      userRole: isDirector ? 'director' : 'worker',
+      userRole: (user?.role as any) ?? 'worker',
       action: 'Создание',
       entity: 'Продажа',
       details: `${productName(product, locale)}, ${sName.trim()}, ${amount.toLocaleString()} UZS`,
@@ -393,7 +396,7 @@ export default function ProductDetail() {
                 </p>
               )}
             </div>
-            {isDirector && (
+            {canEdit && (
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -417,7 +420,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {editOpen && isDirector && (
+      {editOpen && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl border max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
@@ -566,7 +569,7 @@ export default function ProductDetail() {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            disabled={product.quantity <= 0}
+            disabled={!canDebt || product.quantity <= 0}
             onClick={() => {
               setDebtorPick('');
               setDName('');

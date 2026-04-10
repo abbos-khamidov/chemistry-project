@@ -11,7 +11,7 @@ type PendingAction =
   | { type: 'deactivate' | 'activate' | 'delete'; worker: User };
 
 export default function Workers() {
-  const { user, workers, createWorkerAccount, setWorkerStatus, deleteWorkerAccount, updateWorkerCredentialsByDirector } =
+  const { user, workers, createStaffAccount, setWorkerStatus, setStaffPermissionsByDirector, deleteWorkerAccount, updateWorkerCredentialsByDirector } =
     useAuth();
   const { appendAudit } = useWarehouse();
   const { t } = useI18n();
@@ -19,6 +19,12 @@ export default function Workers() {
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [staffRole, setStaffRole] = useState<'worker' | 'assistant'>('worker');
+  const [permAnalytics, setPermAnalytics] = useState(false);
+  const [permAddProducts, setPermAddProducts] = useState(false);
+  const [permEditProducts, setPermEditProducts] = useState(false);
+  const [permIssueDebt, setPermIssueDebt] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
   const [editWorker, setEditWorker] = useState<User | null>(null);
@@ -82,7 +88,15 @@ export default function Workers() {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const result = createWorkerAccount(user, {
+    const result = createStaffAccount(user, {
+      role: staffRole,
+      permissions: staffRole === 'assistant' ? {
+        analytics: permAnalytics,
+        addProducts: permAddProducts,
+        editProducts: permEditProducts,
+        issueDebt: permIssueDebt,
+      } : undefined,
+
       fullName,
       phone,
       username,
@@ -98,7 +112,7 @@ export default function Workers() {
       userRole: 'director',
       action: 'Создание',
       entity: 'Пользователь',
-      details: `Рабочий: ${fullName.trim()}, логин ${username.trim().toLowerCase()}`,
+      details: `${staffRole === 'assistant' ? 'Ассистент' : 'Рабочий'}: ${fullName.trim()}, логин ${username.trim().toLowerCase()}`,
       ip: '—',
     });
     toast.success(t('workers.toastCreateOk'), {
@@ -108,6 +122,11 @@ export default function Workers() {
     setPhone('');
     setUsername('');
     setPassword('');
+    setStaffRole('worker');
+    setPermAnalytics(false);
+    setPermAddProducts(false);
+    setPermEditProducts(false);
+    setPermIssueDebt(false);
   };
 
   const copyCreds = () => {
@@ -301,6 +320,39 @@ export default function Workers() {
                 placeholder="+998 90 123 45 67"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Роль</label>
+              <select
+                value={staffRole}
+                onChange={(e) => setStaffRole(e.target.value as 'worker' | 'assistant')}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+              >
+                <option value="worker">Рабочий</option>
+                <option value="assistant">Ассистент директора</option>
+              </select>
+            </div>
+
+            {staffRole === 'assistant' && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-900">Права ассистента</p>
+                <label className="flex items-center gap-3 text-sm text-slate-800">
+                  <input type="checkbox" checked={permAnalytics} onChange={(e) => setPermAnalytics(e.target.checked)} />
+                  Возможность аналитики
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-800">
+                  <input type="checkbox" checked={permAddProducts} onChange={(e) => setPermAddProducts(e.target.checked)} />
+                  Возможность добавлять товары
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-800">
+                  <input type="checkbox" checked={permEditProducts} onChange={(e) => setPermEditProducts(e.target.checked)} />
+                  Возможность изменять товары
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-800">
+                  <input type="checkbox" checked={permIssueDebt} onChange={(e) => setPermIssueDebt(e.target.checked)} />
+                  Выдавать товар в долг
+                </label>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("workers.login")}</label>
               <input

@@ -61,7 +61,7 @@ export interface ClientSale {
   amountUzs: number;
   date: string;
   createdByUserId?: string;
-  createdByRole?: 'director' | 'worker';
+  createdByRole?: 'director' | 'assistant' | 'worker';
 }
 
 export interface Debt {
@@ -71,7 +71,7 @@ export interface Debt {
   /** Компания должника */
   company?: string;
   /** Кто оформил: рабочий не может менять долг после сохранения (только просмотр) */
-  createdByRole?: 'director' | 'worker';
+  createdByRole?: 'director' | 'assistant' | 'worker';
   createdByUserId?: string;
   totalAmount: number;
   paidAmount: number;
@@ -101,7 +101,14 @@ export interface User {
   phone: string;
   /** Логин для входа (символы, не email) */
   username: string;
-  role: 'director' | 'worker';
+  role: 'director' | 'assistant' | 'worker';
+  /** Права ассистента директора (для роли assistant). Директор всегда имеет полный доступ. */
+  permissions?: {
+    analytics?: boolean;
+    addProducts?: boolean;
+    editProducts?: boolean;
+    issueDebt?: boolean;
+  };
   status: 'active' | 'inactive';
   lastActivity: string;
 }
@@ -136,7 +143,7 @@ export interface AuditLogEntry {
   id: string;
   at: string;
   userName: string;
-  userRole: 'director' | 'worker';
+  userRole: 'director' | 'assistant' | 'worker';
   action: string;
   entity: string;
   details: string;

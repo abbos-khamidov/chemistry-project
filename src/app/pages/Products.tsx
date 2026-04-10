@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Plus, Search, Filter, Grid, List, AlertCircle, Package, ChevronRight, X, ImageIcon } from "lucide-react";
 import { useWarehouse } from "../context/WarehouseContext";
 import { useAuth } from "../context/AuthContext";
+import { canAddProducts } from '../lib/permissions';
 import { useI18n } from "../i18n/I18nContext";
 import { productName } from "../lib/productLocale";
 
@@ -14,6 +15,7 @@ export default function Products() {
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === "director";
+  const canAdd = canAddProducts(user);
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,6 +96,7 @@ export default function Products() {
 
   const submitProduct = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAdd) return;
     const q = Number(quantity);
     const pr = Number(price);
     if (!name.trim() || !Number.isFinite(q) || !Number.isFinite(pr)) {
@@ -116,7 +119,7 @@ export default function Products() {
     });
     appendAudit({
       userName: user?.fullName ?? "—",
-      userRole: "director",
+      userRole: (user?.role as any) ?? "director",
       action: "Создание",
       entity: "Товар",
       details: name.trim(),
@@ -162,7 +165,7 @@ export default function Products() {
               </p>
             )}
           </div>
-          {isDirector && (
+          {canAdd && (
           <button
             type="button"
             onClick={() => setModalOpen(true)}
@@ -175,7 +178,7 @@ export default function Products() {
         </div>
       </div>
 
-      {modalOpen && isDirector && (
+      {modalOpen && canAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">

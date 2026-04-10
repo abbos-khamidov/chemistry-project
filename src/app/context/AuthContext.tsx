@@ -17,7 +17,7 @@ const STORAGE_USERS = 'warehouse-auth-users-v3';
 const STORAGE_SESSION_LEGACY = 'warehouse-auth-session-v2';
 
 type AuthResult =
-  | { ok: true; role: 'director' | 'worker' }
+  | { ok: true; role: 'director' | 'assistant' | 'worker' }
   | { ok: false; error?: string };
 
 export type CreateWorkerInput = {
@@ -27,12 +27,23 @@ export type CreateWorkerInput = {
   password: string;
 };
 
+export type CreateStaffInput = CreateWorkerInput & {
+  role: 'worker' | 'assistant';
+  permissions?: {
+    analytics?: boolean;
+    addProducts?: boolean;
+    editProducts?: boolean;
+    issueDebt?: boolean;
+  };
+};
+
 type StoredAccount = User & { password: string };
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
-function migrateRole(role: string): 'director' | 'worker' {
+function migrateRole(role: string): 'director' | 'assistant' | 'worker' {
   const r = role.toLowerCase();
+  if (r == 'assistant' || r == 'director_assistant') return 'assistant';
   if (r === 'admin' || r === 'manager' || r === 'director') return 'director';
   return 'worker';
 }
@@ -71,6 +82,15 @@ function normalizeStored(a: unknown): StoredAccount {
     role,
     status: x.status === 'inactive' ? 'inactive' : 'active',
     lastActivity: String(x.lastActivity ?? ''),
+    permissions:
+      x.permissions && typeof x.permissions === 'object'
+        ? {
+            analytics: Boolean((x.permissions as any).analytics),
+            addProducts: Boolean((x.permissions as any).addProducts),
+            editProducts: Boolean((x.permissions as any).editProducts),
+            issueDebt: Boolean((x.permissions as any).issueDebt),
+          }
+        : undefined,
     password: String(x.password ?? ''),
   };
 }
@@ -182,7 +202,9 @@ type AuthContextValue = {
   login: (username: string, password: string) => AuthResult;
   logout: () => void;
   createWorkerAccount: (director: User | null, input: CreateWorkerInput) => AuthResult;
+  createStaffAccount: (director: User | null, input: CreateStaffInput) => AuthResult;
   setWorkerStatus: (director: User | null, workerId: string, status: 'active' | 'inactive') => AuthResult;
+  setStaffPermissionsByDirector: (director: User | null, staffId: string, permissions: NonNullable<User['permissions']>) => AuthResult;
   deleteWorkerAccount: (director: User | null, workerId: string) => AuthResult;
   updateDirectorProfile: (director: User | null, input: UpdateDirectorProfileInput) => AuthResult;
   updateWorkerCredentialsByDirector: (
@@ -212,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const workers = useMemo(
-    () => accounts.filter((a) => a.role === 'worker').map(stripPassword),
+    () => accounts.filter((a) => a.role === 'worker' || a.role === 'assistant').map(stripPassword),
     [accounts]
   );
 
@@ -252,14 +274,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const list = loadAccounts();
       const idx = list.findIndex((a) => a.id === workerId);
-      if (idx === -1 || list[idx].role !== 'worker') {
-        return { ok: false, error: 'Рабочий не найден' };
+      if (idx === -1 || (list[idx].role !== 'worker' && list[idx].role !== 'assistant')) {
+        return { ok: false, error: 'Сотрудник не найден' };
       }
       const next = [...list];
       next[idx] = { ...next[idx], status };
       saveAccounts(next);
       setAccounts(next);
-      return { ok: true, role: 'worker' };
+      return { ok: true, role: list[idx].role };
     },
     []
   );
@@ -273,8 +295,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const list = loadAccounts();
     const target = list.find((a) => a.id === workerId);
-    if (!target || target.role !== 'worker') {
-      return { ok: false, error: 'Рабочий не найден' };
+    if (!target || (target.role !== 'worker' && target.role !== 'assistant')) {
+      return { ok: false, error: 'Сотрудник не найден' };
     }
     const next = list.filter((a) => a.id !== workerId);
     saveAccounts(next);
@@ -320,6 +342,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+
+  const createStaffAccount = useCallback(
+    (director: User | null, input: CreateStaffInput): AuthResult => {
+      if (!director || director.role !== 'director') {
+        return { ok: false, error: 'Учётные записи создаёт только директор' };
+      }
+      const uname = input.username.trim().toLowerCase();
+      if (!USERNAME_RE.test(uname)) {
+        return {
+          ok: false,
+          error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+        };
+      }
+      const list = loadAccounts();
+      if (list.some((a) => a.username.toLowerCase() === uname)) {
+        return { ok: false, error: 'Такой логин уже занят' };
+      }
+      if (input.password.length < 4) {
+        return { ok: false, error: 'Пароль не короче 4 символов' };
+      }
+      const id = `w-${Date.now()}`;
+      const role: 'worker' | 'assistant' = input.role;
+      const acc: StoredAccount = {
+        id,
+        fullName: input.fullName.trim(),
+        phone: input.phone.trim(),
+        username: uname,
+        role,
+        permissions:
+          role === 'assistant'
+            ? {
+                analytics: Boolean(input.permissions?.analytics),
+                addProducts: Boolean(input.permissions?.addProducts),
+                editProducts: Boolean(input.permissions?.editProducts),
+                issueDebt: Boolean(input.permissions?.issueDebt),
+              }
+            : undefined,
+        status: 'active',
+        lastActivity: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        password: input.password,
+      };
+      const next = [...list, acc];
+      saveAccounts(next);
+      setAccounts(next);
+      return { ok: true, role };
+    },
+    []
+  );
+
+  const setStaffPermissionsByDirector = useCallback(
+    (director: User | null, staffId: string, permissions: NonNullable<User['permissions']>): AuthResult => {
+      if (!director || director.role !== 'director') {
+        return { ok: false, error: 'Права меняет только директор' };
+      }
+      const list = loadAccounts();
+      const idx = list.findIndex((a) => a.id === staffId);
+      if (idx == -1) return { ok: false, error: 'Сотрудник не найден' };
+      if (list[idx].role !== 'assistant') {
+        return { ok: false, error: 'Права доступны только для ассистента' };
+      }
+      const next = [...list];
+      next[idx] = {
+        ...next[idx],
+        permissions: {
+          analytics: Boolean(permissions.analytics),
+          addProducts: Boolean(permissions.addProducts),
+          editProducts: Boolean(permissions.editProducts),
+          issueDebt: Boolean(permissions.issueDebt),
+        },
+      };
+      saveAccounts(next);
+      setAccounts(next);
+      if (user?.id === staffId) {
+        setUser(stripPassword(next[idx]));
+      }
+      return { ok: true, role: 'assistant' };
+    },
+    [user?.id]
+  );
   const logout = useCallback(() => {
     setUser(null);
     persistSession(null);
@@ -444,7 +545,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       createWorkerAccount,
+      createStaffAccount,
       setWorkerStatus,
+      setStaffPermissionsByDirector,
       deleteWorkerAccount,
       updateDirectorProfile,
       updateWorkerCredentialsByDirector,
@@ -455,7 +558,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       createWorkerAccount,
+      createStaffAccount,
       setWorkerStatus,
+      setStaffPermissionsByDirector,
       deleteWorkerAccount,
       updateDirectorProfile,
       updateWorkerCredentialsByDirector,

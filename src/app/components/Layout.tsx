@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
+import { getPermissions } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -32,6 +33,7 @@ export default function Layout() {
   const { user: currentUser, logout } = useAuth();
   const { products, debts, clientSales } = useWarehouse();
   const { t, locale } = useI18n();
+  const perms = getPermissions(currentUser);
 
   const navigation = useMemo(() => {
     if (currentUser.role === 'director') {
@@ -45,12 +47,23 @@ export default function Layout() {
         { nameKey: 'layout.navWorkers', href: '/workers', icon: Users },
       ];
     }
+    if (currentUser.role === 'assistant') {
+      const nav = [
+        { nameKey: 'layout.navProducts', href: '/products', icon: Package },
+        { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
+        { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
+      ];
+      if (perms.analytics) {
+        nav.unshift({ nameKey: 'layout.navAnalytics', href: '/analytics', icon: BarChart3 });
+      }
+      return nav;
+    }
     return [
       { nameKey: 'layout.navProducts', href: '/products', icon: Package },
       { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
       { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
     ];
-  }, [currentUser.role]);
+  }, [currentUser.role, perms.analytics]);
 
 
   const handleLogout = () => {
@@ -182,7 +195,7 @@ export default function Layout() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-slate-800">{currentUser.fullName}</p>
-                <p className="text-xs text-slate-500">{currentUser.role === 'director' ? t('layout.roleDirector') : t('layout.roleWorker')}</p>
+                <p className="text-xs text-slate-500">{currentUser.role === 'director' ? t('layout.roleDirector') : currentUser.role === 'assistant' ? 'Ассистент' : t('layout.roleWorker')}</p>
               </div>
             </button>
           </div>
@@ -240,7 +253,7 @@ export default function Layout() {
             <div className="flex items-center gap-2">
               <LanguageSwitcher />
               <div className="hidden md:block px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-full">
-                {currentUser.role === 'director' ? t('layout.roleDirector') : t('layout.roleWorker')}
+                {currentUser.role === 'director' ? t('layout.roleDirector') : currentUser.role === 'assistant' ? 'Ассистент' : t('layout.roleWorker')}
               </div>
 
               <NotificationsPopover />

@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { format, eachMonthOfInterval, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale/ru';
 import { uz } from 'date-fns/locale/uz';
-import { toast } from 'sonner';
-import { Download, Calendar, TrendingUp, TrendingDown, Banknote, Package, FileText } from 'lucide-react';
+import { Calendar, TrendingUp, TrendingDown, Banknote, Package, FileText } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -19,7 +18,6 @@ import {
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { dateInRange } from '../lib/warehouseUtils';
-import { exportAnalyticsToXlsx } from '../lib/exportAnalyticsXlsx';
 
 function defaultRange() {
   const end = new Date();
@@ -139,26 +137,6 @@ export default function Analytics() {
       .slice(0, 5);
   }, [products]);
 
-  const handleExport = () => {
-    try {
-      exportAnalyticsToXlsx({
-        startDate,
-        endDate,
-        t,
-        stats,
-        monthlyInventoryData,
-        debtAnalytics,
-        topProducts,
-        totalWarehouseValue,
-      });
-      toast.success(t('analytics.exportToastTitle'), {
-        description: `${startDate} — ${endDate}. ${t('analytics.exportToastDesc')}`,
-      });
-    } catch {
-      toast.error(t('analytics.exportError'));
-    }
-  };
-
   const totalWarehouseValue = stats.totalWarehouseValue;
   const totalDebtsRemaining = stats.totalDebtsRemaining;
 
@@ -189,14 +167,6 @@ export default function Analytics() {
                 className="px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
               />
             </div>
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors sm:ml-auto"
-            >
-              <Download className="w-4 h-4" />
-              <span>{t('analytics.export')}</span>
-            </button>
           </div>
         </div>
       </div>

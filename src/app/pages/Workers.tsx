@@ -268,11 +268,67 @@ export default function Workers() {
             <p className="text-xs text-slate-500 mb-4">Измените данные сотрудника, роль и права доступа.</p>
             <div className="space-y-3 mb-6">
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.fullName')}</label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.phone')}</label>
+                <input
+                  type="tel"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Роль</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as 'worker' | 'assistant')}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                >
+                  <option value="worker">Рабочий</option>
+                  <option value="assistant">Ассистент директора</option>
+                </select>
+              </div>
+              {editRole === 'assistant' && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">Права ассистента</p>
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={editPermAnalytics} onChange={(e) => setEditPermAnalytics(e.target.checked)} />
+                    Возможность аналитики
+                  </label>
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={editPermAddProducts} onChange={(e) => setEditPermAddProducts(e.target.checked)} />
+                    Возможность добавлять товары
+                  </label>
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={editPermEditProducts} onChange={(e) => setEditPermEditProducts(e.target.checked)} />
+                    Возможность изменять товары
+                  </label>
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={editPermIssueDebt} onChange={(e) => setEditPermIssueDebt(e.target.checked)} />
+                    Выдавать товар в долг
+                  </label>
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={editPermManageStaff} onChange={(e) => setEditPermManageStaff(e.target.checked)} />
+                    Управление сотрудниками (добавлять, редактировать, отключать)
+                  </label>
+                </div>
+              )}
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
                 <input
                   type="text"
                   required
-                  pattern="[a-zA-Z0-9_.\\-]{2,32}"
+                  pattern="[a-zA-Z0-9_.\-]{2,32}"
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
@@ -398,6 +454,10 @@ export default function Workers() {
                 <label className="flex items-center gap-3 text-sm text-slate-800">
                   <input type="checkbox" checked={permIssueDebt} onChange={(e) => setPermIssueDebt(e.target.checked)} />
                   Выдавать товар в долг
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-800">
+                  <input type="checkbox" checked={permManageStaff} onChange={(e) => setPermManageStaff(e.target.checked)} />
+                  Управление сотрудниками (добавлять, редактировать, отключать)
                 </label>
               </div>
             )}

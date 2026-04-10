@@ -242,9 +242,9 @@ export default function Workers() {
           <form
             onSubmit={handleEditSave}
             className="bg-white rounded-xl border border-slate-200 shadow-lg max-w-md w-full p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-1">{t('workers.editAccessTitle')}</h2>
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">Редактирование учётки</h2>
             <p className="text-sm text-slate-600 mb-4">{editWorker.fullName}</p>
-            <p className="text-xs text-slate-500 mb-4">{t('workers.editAccessHint')}</p>
+            <p className="text-xs text-slate-500 mb-4">Измените данные сотрудника, роль и права доступа.</p>
             <div className="space-y-3 mb-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
@@ -440,6 +440,19 @@ export default function Workers() {
                     <p className="font-medium text-slate-900">{w.fullName}</p>
                     <p className="text-sm text-slate-600">@{w.username}</p>
                     <p className="text-xs text-slate-500">{w.phone}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full ${w.role === 'assistant' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
+                        {w.role === 'assistant' ? 'Ассистент директора' : 'Рабочий'}
+                      </span>
+                      {w.role === 'assistant' && (
+                        <>
+                          {w.permissions?.analytics && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Аналитика</span>}
+                          {w.permissions?.addProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Добавлять товары</span>}
+                          {w.permissions?.editProducts && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
+                          {w.permissions?.issueDebt && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span
@@ -455,7 +468,7 @@ export default function Workers() {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 text-slate-800 bg-slate-50 rounded-lg hover:bg-slate-100"
                     >
                       <KeyRound className="w-4 h-4" />
-                      {t('workers.editAccess')}
+                      Изменить
                     </button>
                     {w.status === 'active' ? (
                       <button

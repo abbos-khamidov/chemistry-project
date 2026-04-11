@@ -12,13 +12,3 @@ export function dateInRange(dateStr: string, start: string, end: string): boolea
   return d >= start && d <= end;
 }
 
-export function kpiInDateRange(
-  periodStart: string,
-  periodEnd: string,
-  rangeStart: string,
-  rangeEnd: string
-): boolean {
-  const ps = periodStart.slice(0, 10);
-  const pe = periodEnd.slice(0, 10);
-  return ps <= rangeEnd && pe >= rangeStart;
-}

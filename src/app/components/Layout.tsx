@@ -8,7 +8,6 @@ import {
   X,
   ChevronDown,
   FileSearch,
-  Target,
   Wallet,
   Users,
   UserCircle,
@@ -44,7 +43,6 @@ export default function Layout() {
       return [
         { nameKey: 'layout.navAnalytics', href: '/analytics', icon: BarChart3 },
         { nameKey: 'layout.navAudit', href: '/audit', icon: FileSearch },
-        { nameKey: 'layout.navWorkerKpi', href: '/worker-kpi', icon: Target },
         { nameKey: 'layout.navProducts', href: '/products', icon: Package },
         { nameKey: 'layout.navClients', href: '/clients', icon: UserCircle },
         { nameKey: 'layout.navDebts', href: '/debts', icon: Wallet },
@@ -109,7 +107,7 @@ export default function Layout() {
 
     for (const pr of products) {
       const title = productName(pr, locale);
-      const blob = [title, pr.name, pr.nameUz ?? '', String(pr.price), String(pr.quantity)].join(' ').toLowerCase();
+      const blob = [title, pr.name, String(pr.price), String(pr.quantity)].join(' ').toLowerCase();
       if (blob.includes(q)) {
         out.push({ key: `p:${pr.id}`, title, subtitle: t('layout.navProducts'), to: `/products/${pr.id}` });
       }

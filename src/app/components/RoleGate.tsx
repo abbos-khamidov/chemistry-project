@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { canManageStaff, canViewAnalytics, canViewDebts } from '../lib/permissions';
 
-/** Только директор: аналитика, аудит, KPI. */
+/** Только директор: аналитика, аудит. */
 export function DirectorOnly({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;

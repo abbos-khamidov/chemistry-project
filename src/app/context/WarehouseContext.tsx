@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, WorkerKPI, ClientSale } from '../data/mockData';
+import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, ClientSale } from '../data/mockData';
 import { deriveProductStatus } from '../lib/warehouseUtils';
 import { getSessionUserIdFromCookie } from '../lib/sessionCookie';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -21,7 +21,6 @@ export type WarehousePersisted = {
   products: Product[];
   debts: Debt[];
   clientSales: ClientSale[];
-  workerKpis: WorkerKPI[];
   auditLog: AuditLogEntry[];
   readAuditIds: string[];
 };
@@ -30,7 +29,6 @@ const empty = (): WarehousePersisted => ({
   products: [],
   debts: [],
   clientSales: [],
-  workerKpis: [],
   auditLog: [],
   readAuditIds: [],
 });
@@ -160,18 +158,6 @@ type ClientSaleRow = {
   created_by_role: ClientSale['createdByRole'] | null;
 };
 
-type WorkerKpiRow = {
-  user_id: string;
-  full_name: string;
-  operations_count: number;
-  reception_accuracy: string | number;
-  deadline_compliance: string | number;
-  tasks_on_time: number;
-  period: string;
-  period_start: string;
-  period_end: string;
-};
-
 type AuditLogRow = {
   id: string;
   at: string;
@@ -192,14 +178,12 @@ async function loadFromDb(): Promise<WarehousePersisted> {
     productsRes,
     debtsRes,
     salesRes,
-    kpiRes,
     auditRes,
     readsRes,
   ] = await Promise.all([
     supabase.from('products').select('*'),
     supabase.from('debts').select('*'),
     supabase.from('client_sales').select('*'),
-    supabase.from('worker_kpis').select('*'),
     supabase.from('audit_log').select('*').order('at', { ascending: false }),
     userId ? supabase.from('audit_reads').select('audit_id').eq('user_id', userId) : Promise.resolve({ data: [], error: null }),
   ]);
@@ -207,14 +191,12 @@ async function loadFromDb(): Promise<WarehousePersisted> {
   logSupabaseError('products select failed', productsRes.error);
   logSupabaseError('debts select failed', debtsRes.error);
   logSupabaseError('client_sales select failed', salesRes.error);
-  logSupabaseError('worker_kpis select failed', kpiRes.error);
   logSupabaseError('audit_log select failed', auditRes.error);
   logSupabaseError('audit_reads select failed', (readsRes as any).error);
 
   const products = ((productsRes.data as ProductRow[] | null) ?? []).map((r) => ({
     id: r.id,
     name: r.name,
-    nameUz: r.name_uz ?? undefined,
     imageUrl: r.image_url ?? undefined,
     category: r.category,
     categoryUz: r.category_uz ?? undefined,
@@ -264,18 +246,6 @@ async function loadFromDb(): Promise<WarehousePersisted> {
     createdByRole: r.created_by_role ?? undefined,
   }));
 
-  const workerKpis = ((kpiRes.data as WorkerKpiRow[] | null) ?? []).map((r) => ({
-    userId: r.user_id,
-    fullName: r.full_name,
-    operationsCount: Number(r.operations_count ?? 0),
-    receptionAccuracy: Number(r.reception_accuracy ?? 0),
-    deadlineCompliance: Number(r.deadline_compliance ?? 0),
-    tasksOnTime: Number(r.tasks_on_time ?? 0),
-    period: r.period,
-    periodStart: r.period_start,
-    periodEnd: r.period_end,
-  }));
-
   const auditLog = ((auditRes.data as AuditLogRow[] | null) ?? []).map((r) => ({
     id: r.id,
     at: r.at,
@@ -289,14 +259,14 @@ async function loadFromDb(): Promise<WarehousePersisted> {
 
   const readAuditIds = (((readsRes as any).data as Array<{ audit_id: string }> | null) ?? []).map((r) => r.audit_id);
 
-  return { products, debts, clientSales, workerKpis, auditLog, readAuditIds };
+  return { products, debts, clientSales, auditLog, readAuditIds };
 }
 
 function toProductRows(products: Product[]): ProductRow[] {
   return products.map((p) => ({
     id: p.id,
     name: p.name,
-    name_uz: p.nameUz ?? null,
+    name_uz: null,
     image_url: p.imageUrl ?? null,
     category: p.category,
     category_uz: p.categoryUz ?? null,
@@ -349,20 +319,6 @@ function toClientSaleRows(rows: ClientSale[]): ClientSaleRow[] {
   }));
 }
 
-function toWorkerKpiRows(rows: WorkerKPI[]): WorkerKpiRow[] {
-  return rows.map((r) => ({
-    user_id: r.userId,
-    full_name: r.fullName,
-    operations_count: r.operationsCount,
-    reception_accuracy: r.receptionAccuracy,
-    deadline_compliance: r.deadlineCompliance,
-    tasks_on_time: r.tasksOnTime,
-    period: r.period,
-    period_start: r.periodStart,
-    period_end: r.periodEnd,
-  }));
-}
-
 function toAuditRows(rows: AuditLogEntry[]): AuditLogRow[] {
   return rows.map((r) => ({
     id: r.id,
@@ -404,10 +360,6 @@ async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
     const { error } = await supabase.from('client_sales').upsert(toClientSaleRows(next.clientSales), { onConflict: 'id' });
     logSupabaseError('client_sales upsert failed', error);
   }
-  if (next.workerKpis.length > 0) {
-    const { error } = await supabase.from('worker_kpis').upsert(toWorkerKpiRows(next.workerKpis));
-    logSupabaseError('worker_kpis upsert failed', error);
-  }
   if (next.auditLog.length > 0) {
     const { error } = await supabase.from('audit_log').upsert(toAuditRows(next.auditLog), { onConflict: 'id' });
     logSupabaseError('audit_log upsert failed', error);
@@ -441,7 +393,6 @@ export type UpdateProductInput = Partial<
     | 'notes'
     | 'shipmentRecipient'
     | 'imageUrl'
-    | 'nameUz'
     | 'categoryUz'
   >
 >;
@@ -584,7 +535,6 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       const product: Product = {
         id,
         name: input.name,
-        nameUz: input.nameUz,
         imageUrl: input.imageUrl,
         category: input.category,
         categoryUz: input.categoryUz,
@@ -649,7 +599,6 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       const updated: Product = {
         ...p,
         name: input.name ?? p.name,
-        nameUz: input.nameUz !== undefined ? input.nameUz : p.nameUz,
         imageUrl: input.imageUrl !== undefined ? input.imageUrl : p.imageUrl,
         category: input.category ?? p.category,
         categoryUz: input.categoryUz !== undefined ? input.categoryUz : p.categoryUz,

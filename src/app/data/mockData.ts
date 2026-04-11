@@ -1,9 +1,6 @@
 export interface Product {
   id: string;
-  /** Основное название (обычно RU) */
   name: string;
-  /** Название на узбекском — при языке UZ */
-  nameUz?: string;
   /** Опциональное фото (data URL или URL) */
   imageUrl?: string;
   category: string;
@@ -156,16 +153,3 @@ export interface AuditLogEntry {
 
 export const mockAuditLog: AuditLogEntry[] = [];
 
-export interface WorkerKPI {
-  userId: string;
-  fullName: string;
-  operationsCount: number;
-  receptionAccuracy: number;
-  deadlineCompliance: number;
-  tasksOnTime: number;
-  period: string;
-  periodStart: string;
-  periodEnd: string;
-}
-
-export const mockWorkerKPIs: WorkerKPI[] = [];

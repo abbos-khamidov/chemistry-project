@@ -1,8 +1,7 @@
 import type { AppLocale } from '../i18n/types';
 import type { Product } from '../data/mockData';
 
-export function productName(p: Product, locale: AppLocale): string {
-  if (locale === 'uz' && p.nameUz?.trim()) return p.nameUz.trim();
+export function productName(p: Product, _locale: AppLocale): string {
   return p.name;
 }
 

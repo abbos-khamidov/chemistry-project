@@ -47,7 +47,7 @@ export default function ProductDetail() {
   const [eSupplier, setESupplier] = useState('');
   const [eExp, setEExp] = useState('');
   const [eNotes, setENotes] = useState('');
-  const [eNameUz, setENameUz] = useState('');
+
   const [editPhotoPending, setEditPhotoPending] = useState<'keep' | 'removed' | string>('keep');
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,7 +74,7 @@ export default function ProductDetail() {
     setESupplier(product.supplier);
     setEExp(product.expirationDate);
     setENotes(product.notes ?? '');
-    setENameUz(product.nameUz ?? '');
+
     setEditPhotoPending('keep');
     if (editPhotoInputRef.current) editPhotoInputRef.current.value = '';
   }, [product, editOpen]);
@@ -169,7 +169,6 @@ export default function ProductDetail() {
     }
     const patch: UpdateProductInput = {
       name: eName.trim(),
-      nameUz: eNameUz.trim() || undefined,
       quantity: q,
       unit: 'шт',
       price: pr,
@@ -499,14 +498,6 @@ export default function ProductDetail() {
                   required
                   value={eName}
                   onChange={(e) => setEName(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-700 mb-1">{t("common.nameUz")}</label>
-                <input
-                  value={eNameUz}
-                  onChange={(e) => setENameUz(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2"
                 />
               </div>

@@ -33,7 +33,7 @@ export default function Products() {
 
   const filteredProducts = products.filter((product) => {
     const q = searchQuery.toLowerCase();
-    const blob = [product.name, product.nameUz ?? ""].join(" ").toLowerCase();
+    const blob = product.name.toLowerCase();
     const matchesSearch = !q.trim() || blob.includes(q);
 
     let matchesStatus = true;

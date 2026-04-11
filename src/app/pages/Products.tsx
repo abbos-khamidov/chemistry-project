@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { canAddProducts } from '../lib/permissions';
 import { useI18n } from "../i18n/I18nContext";
 import { productName } from "../lib/productLocale";
+import { AmountField } from "../components/AmountField";
 
 const MAX_IMAGE_BYTES = 600 * 1024;
 
@@ -261,15 +262,12 @@ export default function Products() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelPriceUzs")}</label>
-                      <input
-                        required
-                        type="number"
-                        min={0}
-                        step="any"
+                      <AmountField
+                        label={t("products.labelPriceUzs")}
                         value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        onChange={setPrice}
+                        required
+                        inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                       />
                     </div>
                   </div>

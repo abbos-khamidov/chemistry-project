@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { PhoneField } from '../components/PhoneField';
+import { AmountField } from '../components/AmountField';
 import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import { useParams, Link } from 'react-router';
 import { toast } from 'sonner';
@@ -335,15 +336,12 @@ export default function DebtDetail() {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.amountUZSLabel').replace('{max}', debt.remainingAmount.toLocaleString())}</label>
-                  <input
-                    required
-                    type="number"
-                    min={1}
-                    max={debt.remainingAmount}
+                  <AmountField
+                    label={t('debtDetail.amountUZSLabel').replace('{max}', debt.remainingAmount.toLocaleString())}
                     value={amountPay}
-                    onChange={(e) => setAmountPay(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    onChange={setAmountPay}
+                    required
+                    inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                   />
                 </div>
               )}
@@ -481,15 +479,12 @@ export default function DebtDetail() {
               </div>
               {histMode === 'partial' ? (
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.historyAmount')}</label>
-                  <input
-                    required
-                    type="number"
-                    min={0}
-                    step={1}
+                  <AmountField
+                    label={t('debtDetail.historyAmount')}
                     value={histAmount}
-                    onChange={(e) => setHistAmount(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    onChange={setHistAmount}
+                    required
+                    inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                   />
                 </div>
               ) : (

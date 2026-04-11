@@ -24,6 +24,7 @@ import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
 import { PhoneField } from '../components/PhoneField';
+import { AmountField } from '../components/AmountField';
 import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 const MAX_IMAGE_BYTES = 600 * 1024;
 
@@ -514,14 +515,12 @@ export default function ProductDetail() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t("products.colPrice")}</label>
-                  <input
-                    required
-                    type="number"
-                    min={0}
+                  <AmountField
+                    label={t("products.colPrice")}
                     value={ePrice}
-                    onChange={(e) => setEPrice(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2"
+                    onChange={setEPrice}
+                    required
+                    inputClassName="w-full border rounded-lg px-3 py-2"
                   />
                 </div>
               </div>

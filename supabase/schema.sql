@@ -161,9 +161,9 @@ create policy p_audit_all on public.audit_log for all to anon, authenticated usi
 drop policy if exists p_audit_reads_all on public.audit_reads;
 create policy p_audit_reads_all on public.audit_reads for all to anon, authenticated using (true) with check (true);
 
--- Seed director account (clean start)
+-- Seed director: canonical defaults login diyor / password 1234 (do not change in repo; director may change in-app).
 insert into public.accounts (full_name, phone, username, password, role, status, last_activity, permissions)
-values ('Karimov Otabek', '+998901111223', '+998901111223', '1234', 'director', 'active', to_char(now(), 'YYYY-MM-DD HH24:MI'), null)
+values ('Karimov Otabek', '+998901111223', 'diyor', '1234', 'director', 'active', to_char(now(), 'YYYY-MM-DD HH24:MI'), null)
 on conflict (username) do nothing;
 
 -- Realtime publication for cross-device sync

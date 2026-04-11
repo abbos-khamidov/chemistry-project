@@ -9,6 +9,8 @@ import { canManageStaff } from '../lib/permissions';
 import { PhoneField } from '../components/PhoneField';
 import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 
+const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
+
 type PendingAction =
   | null
   | { type: 'deactivate' | 'activate' | 'delete'; worker: User };
@@ -21,6 +23,7 @@ export default function Workers() {
   const allowManageStaff = canManageStaff(user);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'worker' | 'assistant'>('worker');
   const [permAnalytics, setPermAnalytics] = useState(false);
@@ -36,6 +39,7 @@ export default function Workers() {
   const [editWorker, setEditWorker] = useState<User | null>(null);
   const [editFullName, setEditFullName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<'worker' | 'assistant'>('worker');
   const [editPermAnalytics, setEditPermAnalytics] = useState(false);
   const [editPermAddProducts, setEditPermAddProducts] = useState(false);
@@ -70,6 +74,7 @@ export default function Workers() {
     setEditWorker(w);
     setEditFullName(w.fullName);
     setEditPhone(w.phone);
+    setEditUsername(w.username);
     setEditRole(w.role === 'assistant' ? 'assistant' : 'worker');
     setEditPermAnalytics(Boolean(w.permissions?.analytics));
     setEditPermAddProducts(Boolean(w.permissions?.addProducts ?? (w.role === 'worker')));
@@ -85,6 +90,7 @@ export default function Workers() {
     setEditWorker(null);
     setEditFullName('');
     setEditPhone('');
+    setEditUsername('');
     setEditRole('worker');
     setEditPermAnalytics(false);
     setEditPermAddProducts(false);
@@ -109,10 +115,15 @@ export default function Workers() {
       toast.error(t('common.phoneInvalid12'));
       return;
     }
+    const loginU = editUsername.trim().toLowerCase();
+    if (!USERNAME_RE.test(loginU)) {
+      toast.error(t('workers.usernameInvalid'));
+      return;
+    }
     const payload = {
       fullName: editFullName.trim(),
       phone: pn,
-      username: pn,
+      username: loginU,
       password: editPassword || undefined,
       role: editRole,
       permissions:
@@ -148,7 +159,7 @@ export default function Workers() {
       userRole: 'director',
       action: 'Изменение',
       entity: 'Пользователь',
-      details: `Учётка обновлена: ${editFullName.trim()} (${pn}), роль: ${editRole === 'assistant' ? 'ассистент' : 'рабочий'}`,
+      details: `Учётка обновлена: ${editFullName.trim()} (@${loginU}, ${pn}), роль: ${editRole === 'assistant' ? 'ассистент' : 'рабочий'}`,
       ip: '—',
     });
     toast.success(t('workers.toastCredsOk'));
@@ -164,6 +175,11 @@ export default function Workers() {
     const pn = normalizePhoneForStore(phone);
     if (!isCompleteInternationalPhone12(pn)) {
       toast.error(t('common.phoneInvalid12'));
+      return;
+    }
+    const loginU = username.trim().toLowerCase();
+    if (!USERNAME_RE.test(loginU)) {
+      toast.error(t('workers.usernameInvalid'));
       return;
     }
     setSubmitting(true);
@@ -187,7 +203,7 @@ export default function Workers() {
 
       fullName,
       phone: pn,
-      username: pn,
+      username: loginU,
       password,
     });
     setSubmitting(false);
@@ -200,14 +216,15 @@ export default function Workers() {
       userRole: 'director',
       action: 'Создание',
       entity: 'Пользователь',
-      details: `${staffRole === 'assistant' ? 'Ассистент' : 'Рабочий'}: ${fullName.trim()}, логин ${pn}`,
+      details: `${staffRole === 'assistant' ? 'Ассистент' : 'Рабочий'}: ${fullName.trim()}, логин ${loginU}`,
       ip: '—',
     });
     toast.success(t('workers.toastCreateOk'), {
-      description: `${t('workers.login')}: ${pn} — ${t('workers.toastCreateDesc')}`,
+      description: `${t('workers.login')}: ${loginU} — ${t('workers.toastCreateDesc')}`,
     });
     setFullName('');
     setPhone('');
+    setUsername('');
     setPassword('');
     setStaffRole('worker');
     setPermAnalytics(false);
@@ -220,8 +237,8 @@ export default function Workers() {
   };
 
   const copyCreds = () => {
-    const text = `${t('workers.login')}: ${normalizePhoneForStore(phone)}\n${t('workers.password')}: ${password}`;
-    if (!normalizePhoneForStore(phone) || !password) {
+    const text = `${t('workers.login')}: ${username.trim().toLowerCase()}\n${t('workers.password')}: ${password}`;
+    if (!username.trim() || !password) {
       toast.info(t('workers.toastCopyNeed'));
       return;
     }
@@ -329,6 +346,17 @@ export default function Workers() {
                   value={editPhone}
                   onChange={setEditPhone}
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
+                <input
+                  type="text"
+                  required
+                  autoComplete="off"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
                 />
               </div>
               <div>
@@ -464,6 +492,18 @@ export default function Workers() {
                 value={phone}
                 onChange={setPhone}
                 required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
+              <input
+                type="text"
+                required
+                autoComplete="off"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                placeholder="worker1"
               />
             </div>
             <div>

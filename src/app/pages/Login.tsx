@@ -1,12 +1,10 @@
 import React from 'react';
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { Lock } from 'lucide-react';
+import { Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { BrandLogo } from '../components/BrandLogo';
-import { PhoneField } from '../components/PhoneField';
-import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -25,12 +23,7 @@ export default function Login() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const loginKey = normalizePhoneForStore(username);
-    if (!isCompleteInternationalPhone12(loginKey)) {
-      setError(t('login.errorPhone'));
-      return;
-    }
-    const result = await login(loginKey, password);
+    const result = await login(username.trim(), password);
     if (!result.ok) {
       setError(result.error ?? t('login.errorGeneric'));
       return;
@@ -65,14 +58,21 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <PhoneField
-              id="login-phone"
-              label={t('login.username')}
-              value={username}
-              onChange={setUsername}
-              inputClassName="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('login.username')}</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  autoComplete="username"
+                  placeholder="diyor"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
+                  required
+                />
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('login.password')}</label>
@@ -86,6 +86,7 @@ export default function Login() {
                   className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-slate-800"
                   required
                   minLength={4}
+                  autoComplete="current-password"
                 />
               </div>
             </div>

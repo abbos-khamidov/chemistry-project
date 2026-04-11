@@ -27,6 +27,7 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -36,6 +37,7 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
     if (!open || !user) return;
     setFullName(user.fullName);
     setPhone(user.phone);
+    setLoginUsername(user.username);
     setCurrentPassword('');
     setNewPassword('');
     setPasswordConfirm('');
@@ -58,7 +60,7 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
     const result = await updateDirectorProfile(user, {
       fullName,
       phone: pn,
-      newUsername: pn,
+      newUsername: loginUsername.trim().toLowerCase(),
       newPassword: newPassword || undefined,
       passwordConfirm: passwordConfirm || undefined,
       currentPassword: currentPassword || undefined,
@@ -113,6 +115,17 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
                 label={t('workers.phone')}
                 value={phone}
                 onChange={setPhone}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
+              <input
+                type="text"
+                autoComplete="username"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
                 required
               />
               <p className="text-xs text-slate-500 mt-1">{t('profile.credentialsHint')}</p>

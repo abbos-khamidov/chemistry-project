@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { PhoneField } from '../components/PhoneField';
+import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import { useParams, Link } from 'react-router';
 import { toast } from 'sonner';
 import {
@@ -141,9 +143,14 @@ export default function DebtDetail() {
   const submitProfile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !canEditDebt) return;
+    const pn = normalizePhoneForStore(profilePhone);
+    if (!isCompleteInternationalPhone12(pn)) {
+      toast.error(t('common.phoneInvalid12'));
+      return;
+    }
     const result = updateDebtorProfile(id, {
       fullName: profileFullName,
-      phone: profilePhone,
+      phone: pn,
       company: profileCompany,
     });
     if (!result.ok) {
@@ -389,12 +396,12 @@ export default function DebtDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.profilePhone')}</label>
-                <input
-                  required
+                <PhoneField
+                  label={t('debtDetail.profilePhone')}
                   value={profilePhone}
-                  onChange={(e) => setProfilePhone(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  onChange={setProfilePhone}
+                  required
+                  inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                 />
               </div>
               <div>

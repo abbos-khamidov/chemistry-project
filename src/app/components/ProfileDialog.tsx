@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { ArrowRight, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
+import { PhoneField } from './PhoneField';
+import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +27,6 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -35,7 +36,6 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
     if (!open || !user) return;
     setFullName(user.fullName);
     setPhone(user.phone);
-    setUsername(user.username);
     setCurrentPassword('');
     setNewPassword('');
     setPasswordConfirm('');
@@ -49,10 +49,16 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
     e.preventDefault();
     if (!isDirector) return;
     setSaving(true);
+    const pn = normalizePhoneForStore(phone);
+    if (!isCompleteInternationalPhone12(pn)) {
+      toast.error(t('common.phoneInvalid12'));
+      setSaving(false);
+      return;
+    }
     const result = await updateDirectorProfile(user, {
       fullName,
-      phone,
-      newUsername: username,
+      phone: pn,
+      newUsername: pn,
       newPassword: newPassword || undefined,
       passwordConfirm: passwordConfirm || undefined,
       currentPassword: currentPassword || undefined,
@@ -103,23 +109,11 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.phone')}</label>
-              <input
-                type="tel"
+              <PhoneField
+                label={t('workers.phone')}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                onChange={setPhone}
                 required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
-                autoComplete="username"
               />
               <p className="text-xs text-slate-500 mt-1">{t('profile.credentialsHint')}</p>
             </div>

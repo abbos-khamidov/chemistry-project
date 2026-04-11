@@ -23,6 +23,8 @@ import { useAuth } from '../context/AuthContext';
 import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
+import { PhoneField } from '../components/PhoneField';
+import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 const MAX_IMAGE_BYTES = 600 * 1024;
 
 
@@ -266,7 +268,6 @@ export default function ProductDetail() {
         return;
       }
       debtorName = dName.trim();
-      debtorPhone = dPhone.trim();
       debtorCompany = dCompany.trim() || undefined;
     } else {
       const sel = debts.find((d) => d.id === debtorPick);
@@ -275,18 +276,14 @@ export default function ProductDetail() {
         return;
       }
       debtorName = sel.fullName.trim();
-      debtorPhone = dPhone.trim();
       debtorCompany = sel.company?.trim() || undefined;
     }
-    const phoneDigits = debtorPhone.replace(/\D/g, '');
-    if (!debtorPhone || debtorPhone === '—') {
-      toast.error(t('products.toastDebtPhoneRequired'));
+    const debtorPhoneNorm = normalizePhoneForStore(dPhone);
+    if (!isCompleteInternationalPhone12(debtorPhoneNorm)) {
+      toast.error(t('common.phoneInvalid12'));
       return;
     }
-    if (phoneDigits.length < 5) {
-      toast.error(t('products.toastDebtPhoneInvalid'));
-      return;
-    }
+    debtorPhone = debtorPhoneNorm;
     const qty = Number(dQty);
     if (!Number.isInteger(qty) || qty <= 0) {
       toast.error(t('debts.toastQtyInteger'));
@@ -357,12 +354,17 @@ export default function ProductDetail() {
       toast.error(t('products.toastSaleName'));
       return;
     }
+    const sp = normalizePhoneForStore(sPhone);
+    if (sp && !isCompleteInternationalPhone12(sp)) {
+      toast.error(t('common.phoneInvalid12'));
+      return;
+    }
     const qty = Number(sQty);
     const result = recordClientSale({
       productId: product.id,
       quantity: qty,
       fullName: sName.trim(),
-      phone: sPhone.trim() || undefined,
+      phone: sp || undefined,
       company: sCompany.trim() || undefined,
       createdByUserId: user?.id,
       createdByRole: (user?.role as any) ?? 'worker',
@@ -824,14 +826,12 @@ export default function ProductDetail() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
-                      <input
-                        required
-                        type="tel"
-                        autoComplete="tel"
+                      <PhoneField
+                        label={t('debts.phone')}
                         value={dPhone}
-                        onChange={(e) => setDPhone(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        onChange={setDPhone}
+                        required
+                        inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                       />
                     </div>
                   </div>
@@ -849,14 +849,12 @@ export default function ProductDetail() {
                 <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm space-y-2">
                   <p className="font-semibold text-slate-900">{dName}</p>
                   <div>
-                    <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
-                    <input
-                      required
-                      type="tel"
-                      autoComplete="tel"
+                    <PhoneField
+                      label={t('debts.phone')}
                       value={dPhone}
-                      onChange={(e) => setDPhone(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-sm"
+                      onChange={setDPhone}
+                      required
+                      inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-sm"
                     />
                   </div>
                   {dCompany ? <p className="text-slate-600">{dCompany}</p> : null}
@@ -958,11 +956,11 @@ export default function ProductDetail() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
-                  <input
+                  <PhoneField
+                    label={t('debts.phone')}
                     value={sPhone}
-                    onChange={(e) => setSPhone(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                    onChange={setSPhone}
+                    inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                   />
                 </div>
                 <div>

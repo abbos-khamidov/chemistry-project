@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { User } from '../data/mockData';
 import { clearSessionCookie, getSessionUserIdFromCookie, setSessionCookie } from '../lib/sessionCookie';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 
 const STORAGE_SESSION_LEGACY = 'warehouse-auth-session-v2';
 
@@ -46,7 +47,9 @@ type AccountRow = {
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
 function normalizeLogin(s: string): string {
-  return s.trim().toLowerCase();
+  const x = s.trim().replace(/\s/g, '');
+  if (x.startsWith('+')) return x;
+  return x.toLowerCase();
 }
 
 function seedAccounts(): StoredAccount[] {
@@ -54,8 +57,8 @@ function seedAccounts(): StoredAccount[] {
     {
       id: 'seed-director',
       fullName: 'Karimov Otabek',
-      phone: '+998 90 111 22 33',
-      username: 'diyor',
+      phone: '+998901111223',
+      username: '+998901111223',
       role: 'director',
       status: 'active',
       lastActivity: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -335,15 +338,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!canManageStaffByRole(director)) {
       return { ok: false, error: 'Недостаточно прав для создания учётных записей' };
     }
-    const uname = input.username.trim().toLowerCase();
-    if (!USERNAME_RE.test(uname)) {
+    const uname = normalizePhoneForStore(input.username);
+    if (!isCompleteInternationalPhone12(uname)) {
       return {
         ok: false,
-        error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+        error: 'Логин — номер телефона: знак + и ровно 12 цифр',
       };
     }
     const list = await fetchAccountsFromDb();
-    if (list.some((a) => a.username.toLowerCase() === uname)) {
+    if (list.some((a) => normalizeLogin(a.username) === normalizeLogin(uname))) {
       return { ok: false, error: 'Такой логин уже занят' };
     }
     if (input.password.length < 4) {
@@ -352,7 +355,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const acc: StoredAccount = {
       id: crypto.randomUUID(),
       fullName: input.fullName.trim(),
-      phone: input.phone.trim(),
+      phone: normalizePhoneForStore(input.phone),
       username: uname,
       role: 'worker',
       status: 'active',
@@ -370,15 +373,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!canManageStaffByRole(director)) {
       return { ok: false, error: 'Недостаточно прав для создания учётных записей' };
     }
-    const uname = input.username.trim().toLowerCase();
-    if (!USERNAME_RE.test(uname)) {
+    const uname = normalizePhoneForStore(input.username);
+    if (!isCompleteInternationalPhone12(uname)) {
       return {
         ok: false,
-        error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+        error: 'Логин — номер телефона: знак + и ровно 12 цифр',
       };
     }
     const list = await fetchAccountsFromDb();
-    if (list.some((a) => a.username.toLowerCase() === uname)) {
+    if (list.some((a) => normalizeLogin(a.username) === normalizeLogin(uname))) {
       return { ok: false, error: 'Такой логин уже занят' };
     }
     if (input.password.length < 4) {
@@ -388,7 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const acc: StoredAccount = {
       id: crypto.randomUUID(),
       fullName: input.fullName.trim(),
-      phone: input.phone.trim(),
+      phone: normalizePhoneForStore(input.phone),
       username: uname,
       role,
       permissions:
@@ -469,7 +472,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const nextAcc: StoredAccount = { ...list[idx] };
     if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
-    if (input.phone !== undefined) nextAcc.phone = input.phone.trim();
+    if (input.phone !== undefined) {
+      const ph = normalizePhoneForStore(input.phone);
+      if (!isCompleteInternationalPhone12(ph)) {
+        return { ok: false, error: 'Телефон: знак + и ровно 12 цифр' };
+      }
+      nextAcc.phone = ph;
+    }
     const next = [...list];
     next[idx] = nextAcc;
     await upsertAccountsToDb(next);
@@ -488,9 +497,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: 'Учётная запись не найдена' };
     }
     const acc = list[idx];
-    const nextU = input.newUsername != null ? input.newUsername.trim().toLowerCase() : undefined;
+    const rawNewU = input.newUsername != null ? input.newUsername.trim() : undefined;
+    const nextU =
+      rawNewU !== undefined
+        ? rawNewU.startsWith('+')
+          ? normalizePhoneForStore(rawNewU)
+          : rawNewU.toLowerCase()
+        : undefined;
     const wantUser = nextU !== undefined && nextU !== '';
-    const usernameChanged = wantUser && nextU !== acc.username.toLowerCase();
+    const usernameChanged =
+      wantUser && normalizeLogin(nextU) !== normalizeLogin(acc.username);
     const pwd = input.newPassword;
     const wantPwd = pwd != null && pwd !== '';
     const passwordChanged = wantPwd;
@@ -504,13 +520,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: 'Неверный текущий пароль' };
       }
       if (usernameChanged) {
-        if (!USERNAME_RE.test(nextU!)) {
+        if (nextU!.startsWith('+')) {
+          if (!isCompleteInternationalPhone12(nextU!)) {
+            return {
+              ok: false,
+              error: 'Логин — номер: + и ровно 12 цифр',
+            };
+          }
+        } else if (!USERNAME_RE.test(nextU!)) {
           return {
             ok: false,
             error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
           };
         }
-        if (list.some((a, i) => i !== idx && a.username.toLowerCase() === nextU)) {
+        if (list.some((a, i) => i !== idx && normalizeLogin(a.username) === normalizeLogin(nextU!))) {
           return { ok: false, error: 'Такой логин уже занят' };
         }
       }
@@ -526,7 +549,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const nextAcc: StoredAccount = { ...acc };
     if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
-    if (input.phone !== undefined) nextAcc.phone = input.phone.trim();
+    if (input.phone !== undefined) {
+      const ph = normalizePhoneForStore(input.phone);
+      if (!isCompleteInternationalPhone12(ph)) {
+        return { ok: false, error: 'Телефон: знак + и ровно 12 цифр' };
+      }
+      nextAcc.phone = ph;
+    }
     if (usernameChanged && nextU) nextAcc.username = nextU;
     if (passwordChanged && pwd) nextAcc.password = pwd;
 
@@ -542,7 +571,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!director || director.role !== 'director') {
       return { ok: false, error: 'Менять логин и пароль может только директор' };
     }
-    const uname = input.username?.trim().toLowerCase();
+    const uname = input.username?.trim();
     const pwd = input.password;
     const hasU = uname !== undefined && uname !== '';
     const hasP = pwd !== undefined && pwd !== '';
@@ -557,16 +586,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const acc = list[idx];
     const nextAcc: StoredAccount = { ...acc };
     if (hasU) {
-      if (!USERNAME_RE.test(uname!)) {
+      const u = uname!.startsWith('+') ? normalizePhoneForStore(uname!) : uname!;
+      if (uname!.startsWith('+')) {
+        if (!isCompleteInternationalPhone12(u)) {
+          return {
+            ok: false,
+            error: 'Логин — номер: + и ровно 12 цифр',
+          };
+        }
+      } else if (!USERNAME_RE.test(uname!)) {
         return {
           ok: false,
           error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
         };
       }
-      if (list.some((a, i) => i !== idx && a.username.toLowerCase() === uname)) {
+      if (list.some((a, i) => i !== idx && normalizeLogin(a.username) === normalizeLogin(uname!))) {
         return { ok: false, error: 'Такой логин уже занят' };
       }
-      nextAcc.username = uname!;
+      nextAcc.username = uname!.startsWith('+') ? normalizePhoneForStore(uname!) : uname!;
     }
     if (hasP) {
       if ((pwd as string).length < 4) {
@@ -598,20 +635,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const nextAcc: StoredAccount = { ...acc };
 
     if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
-    if (input.phone !== undefined) nextAcc.phone = input.phone.trim();
+    if (input.phone !== undefined) {
+      const ph = normalizePhoneForStore(input.phone);
+      if (!isCompleteInternationalPhone12(ph)) {
+        return { ok: false, error: 'Телефон: знак + и ровно 12 цифр' };
+      }
+      nextAcc.phone = ph;
+    }
 
-    const uname = input.username?.trim().toLowerCase();
+    const uname = input.username?.trim();
     if (uname !== undefined && uname !== '') {
-      if (!USERNAME_RE.test(uname)) {
+      const u = normalizePhoneForStore(uname);
+      if (!isCompleteInternationalPhone12(u)) {
         return {
           ok: false,
-          error: 'Логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание',
+          error: 'Логин — номер телефона: знак + и ровно 12 цифр',
         };
       }
-      if (list.some((a, i) => i !== idx && a.username.toLowerCase() === uname)) {
+      if (list.some((a, i) => i !== idx && normalizeLogin(a.username) === normalizeLogin(u))) {
         return { ok: false, error: 'Такой логин уже занят' };
       }
-      nextAcc.username = uname;
+      nextAcc.username = u;
     }
 
     if (input.password !== undefined && input.password !== '') {

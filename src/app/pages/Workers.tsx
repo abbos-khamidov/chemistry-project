@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { canManageStaff } from '../lib/permissions';
+import { PhoneField } from '../components/PhoneField';
+import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 
 type PendingAction =
   | null
@@ -19,7 +21,6 @@ export default function Workers() {
   const allowManageStaff = canManageStaff(user);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'worker' | 'assistant'>('worker');
   const [permAnalytics, setPermAnalytics] = useState(false);
@@ -43,7 +44,6 @@ export default function Workers() {
   const [editPermManageStaff, setEditPermManageStaff] = useState(false);
   const [editPermEditDebtRecords, setEditPermEditDebtRecords] = useState(false);
   const [editPermViewDebts, setEditPermViewDebts] = useState(true);
-  const [editUsername, setEditUsername] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
@@ -78,7 +78,6 @@ export default function Workers() {
     setEditPermManageStaff(Boolean(w.permissions?.manageStaff));
     setEditPermEditDebtRecords(Boolean(w.permissions?.editDebtRecords));
     setEditPermViewDebts(Boolean(w.permissions?.viewDebts ?? true));
-    setEditUsername(w.username);
     setEditPassword('');
   };
 
@@ -94,7 +93,6 @@ export default function Workers() {
     setEditPermManageStaff(false);
     setEditPermEditDebtRecords(false);
     setEditPermViewDebts(true);
-    setEditUsername('');
     setEditPassword('');
   };
 
@@ -106,11 +104,15 @@ export default function Workers() {
     }
     if (!editWorker || !user) return;
 
-    const u = editUsername.trim().toLowerCase();
+    const pn = normalizePhoneForStore(editPhone);
+    if (!isCompleteInternationalPhone12(pn)) {
+      toast.error(t('common.phoneInvalid12'));
+      return;
+    }
     const payload = {
       fullName: editFullName.trim(),
-      phone: editPhone.trim(),
-      username: u,
+      phone: pn,
+      username: pn,
       password: editPassword || undefined,
       role: editRole,
       permissions:
@@ -146,7 +148,7 @@ export default function Workers() {
       userRole: 'director',
       action: 'Изменение',
       entity: 'Пользователь',
-      details: `Учётка обновлена: ${editFullName.trim()} (@${u}), роль: ${editRole === 'assistant' ? 'ассистент' : 'рабочий'}`,
+      details: `Учётка обновлена: ${editFullName.trim()} (${pn}), роль: ${editRole === 'assistant' ? 'ассистент' : 'рабочий'}`,
       ip: '—',
     });
     toast.success(t('workers.toastCredsOk'));
@@ -157,6 +159,11 @@ export default function Workers() {
     e.preventDefault();
     if (!allowManageStaff) {
       toast.error('Недостаточно прав');
+      return;
+    }
+    const pn = normalizePhoneForStore(phone);
+    if (!isCompleteInternationalPhone12(pn)) {
+      toast.error(t('common.phoneInvalid12'));
       return;
     }
     setSubmitting(true);
@@ -179,8 +186,8 @@ export default function Workers() {
       },
 
       fullName,
-      phone,
-      username,
+      phone: pn,
+      username: pn,
       password,
     });
     setSubmitting(false);
@@ -193,15 +200,14 @@ export default function Workers() {
       userRole: 'director',
       action: 'Создание',
       entity: 'Пользователь',
-      details: `${staffRole === 'assistant' ? 'Ассистент' : 'Рабочий'}: ${fullName.trim()}, логин ${username.trim().toLowerCase()}`,
+      details: `${staffRole === 'assistant' ? 'Ассистент' : 'Рабочий'}: ${fullName.trim()}, логин ${pn}`,
       ip: '—',
     });
     toast.success(t('workers.toastCreateOk'), {
-      description: `${t('workers.login')}: ${username.trim().toLowerCase()} — ${t('workers.toastCreateDesc')}`,
+      description: `${t('workers.login')}: ${pn} — ${t('workers.toastCreateDesc')}`,
     });
     setFullName('');
     setPhone('');
-    setUsername('');
     setPassword('');
     setStaffRole('worker');
     setPermAnalytics(false);
@@ -214,8 +220,8 @@ export default function Workers() {
   };
 
   const copyCreds = () => {
-    const text = `${t('workers.login')}: ${username.trim().toLowerCase()}\n${t('workers.password')}: ${password}`;
-    if (!username || !password) {
+    const text = `${t('workers.login')}: ${normalizePhoneForStore(phone)}\n${t('workers.password')}: ${password}`;
+    if (!normalizePhoneForStore(phone) || !password) {
       toast.info(t('workers.toastCopyNeed'));
       return;
     }
@@ -318,13 +324,11 @@ export default function Workers() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.phone')}</label>
-                <input
-                  type="tel"
-                  required
+                <PhoneField
+                  label={t('workers.phone')}
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                  onChange={setEditPhone}
+                  required
                 />
               </div>
               <div>
@@ -375,17 +379,6 @@ export default function Workers() {
                   </label>
                 </div>
               )}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.login')}</label>
-                <input
-                  type="text"
-                  required
-                  pattern="[a-zA-Z0-9_.\-]{2,32}"
-                  value={editUsername}
-                  onChange={(e) => setEditUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('workers.optionalNewPassword')}</label>
                 <input
@@ -466,14 +459,11 @@ export default function Workers() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{t("workers.phone")}</label>
-              <input
-                type="tel"
-                required
+              <PhoneField
+                label={t('workers.phone')}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
-                placeholder="+998 90 123 45 67"
+                onChange={setPhone}
+                required
               />
             </div>
             <div>
@@ -525,19 +515,6 @@ export default function Workers() {
                 </label>
               </div>
             )}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{t("workers.login")}</label>
-              <input
-                type="text"
-                required
-                pattern="[a-zA-Z0-9_.\\-]{2,32}"
-                title="2–32 символа: латиница, цифры, точка, дефис, подчёркивание"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
-                placeholder="worker_01"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("workers.password")}</label>
               <input

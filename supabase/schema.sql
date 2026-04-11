@@ -163,7 +163,7 @@ create policy p_audit_reads_all on public.audit_reads for all to anon, authentic
 
 -- Seed director account (clean start)
 insert into public.accounts (full_name, phone, username, password, role, status, last_activity, permissions)
-values ('Karimov Otabek', '+998 90 111 22 33', 'diyor', '1234', 'director', 'active', to_char(now(), 'YYYY-MM-DD HH24:MI'), null)
+values ('Karimov Otabek', '+998901111223', '+998901111223', '1234', 'director', 'active', to_char(now(), 'YYYY-MM-DD HH24:MI'), null)
 on conflict (username) do nothing;
 
 -- Realtime publication for cross-device sync

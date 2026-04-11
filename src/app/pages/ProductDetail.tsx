@@ -246,6 +246,20 @@ export default function ProductDetail() {
       toast.error(t('products.toastPickDebtor'));
       return;
     }
+    const issue = dIssue.trim();
+    const due = dDue.trim();
+    if (!issue) {
+      toast.error(t('products.toastDebtIssueRequired'));
+      return;
+    }
+    if (!due) {
+      toast.error(t('products.toastDebtDueRequired'));
+      return;
+    }
+    if (due < issue) {
+      toast.error(t('products.toastDebtDueBeforeIssue'));
+      return;
+    }
     let debtorName = '';
     let debtorPhone = '';
     let debtorCompany: string | undefined;
@@ -255,7 +269,7 @@ export default function ProductDetail() {
         return;
       }
       debtorName = dName.trim();
-      debtorPhone = dPhone.trim() || '—';
+      debtorPhone = dPhone.trim();
       debtorCompany = dCompany.trim() || undefined;
     } else {
       const sel = debts.find((d) => d.id === debtorPick);
@@ -264,8 +278,17 @@ export default function ProductDetail() {
         return;
       }
       debtorName = sel.fullName.trim();
-      debtorPhone = sel.phone.trim() || '—';
+      debtorPhone = dPhone.trim();
       debtorCompany = sel.company?.trim() || undefined;
+    }
+    const phoneDigits = debtorPhone.replace(/\D/g, '');
+    if (!debtorPhone || debtorPhone === '—') {
+      toast.error(t('products.toastDebtPhoneRequired'));
+      return;
+    }
+    if (phoneDigits.length < 5) {
+      toast.error(t('products.toastDebtPhoneInvalid'));
+      return;
     }
     const qty = Number(dQty);
     if (!Number.isInteger(qty) || qty <= 0) {
@@ -290,8 +313,8 @@ export default function ProductDetail() {
       totalAmount: total,
       paidAmount: 0,
       remainingAmount: total,
-      issueDate: dIssue || new Date().toISOString().slice(0, 10),
-      dueDate: dDue || new Date().toISOString().slice(0, 10),
+      issueDate: issue,
+      dueDate: due,
       status: 'active',
       products: [
         {
@@ -575,6 +598,8 @@ export default function ProductDetail() {
               setDName('');
               setDPhone('');
               setDCompany('');
+              setDIssue(new Date().toISOString().slice(0, 10));
+              setDDue('');
               setDebtOpen(true);
             }}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -821,6 +846,9 @@ export default function ProductDetail() {
                     <div>
                       <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
                       <input
+                        required
+                        type="tel"
+                        autoComplete="tel"
                         value={dPhone}
                         onChange={(e) => setDPhone(e.target.value)}
                         className="w-full border border-slate-300 rounded-lg px-3 py-2"
@@ -838,9 +866,19 @@ export default function ProductDetail() {
                 </>
               )}
               {debtorPick && debtorPick !== '__new__' && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm space-y-2">
                   <p className="font-semibold text-slate-900">{dName}</p>
-                  <p className="text-slate-600">{dPhone}</p>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t('debts.phone')}</label>
+                    <input
+                      required
+                      type="tel"
+                      autoComplete="tel"
+                      value={dPhone}
+                      onChange={(e) => setDPhone(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-sm"
+                    />
+                  </div>
                   {dCompany ? <p className="text-slate-600">{dCompany}</p> : null}
                 </div>
               )}
@@ -874,6 +912,7 @@ export default function ProductDetail() {
                 <div>
                   <label className="block text-sm text-slate-700 mb-1">{t('debts.issueDate')}</label>
                   <input
+                    required
                     type="date"
                     value={dIssue}
                     onChange={(e) => setDIssue(e.target.value)}
@@ -883,6 +922,7 @@ export default function ProductDetail() {
                 <div>
                   <label className="block text-sm text-slate-700 mb-1">{t('debts.dueDate')}</label>
                   <input
+                    required
                     type="date"
                     value={dDue}
                     onChange={(e) => setDDue(e.target.value)}

@@ -256,6 +256,11 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       debtorSelectPlaceholder: '— Выберите должника —',
       debtorNewContact: 'Новый контакт (вручную)',
       toastPickDebtor: 'Выберите должника из списка или «Новый контакт»',
+      toastDebtIssueRequired: 'Укажите дату выдачи',
+      toastDebtDueRequired: 'Укажите срок оплаты',
+      toastDebtDueBeforeIssue: 'Срок оплаты не может быть раньше даты выдачи',
+      toastDebtPhoneRequired: 'Укажите номер телефона',
+      toastDebtPhoneInvalid: 'Введите корректный номер телефона (минимум 5 цифр)',
 
     },
     debts: {
@@ -669,6 +674,11 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       debtorSelectPlaceholder: '— Tanlang —',
       debtorNewContact: 'Yangi kontakt (qo‘lda)',
       toastPickDebtor: 'Ro‘yxatdan qarzdorni tanlang yoki «Yangi kontakt»',
+      toastDebtIssueRequired: 'Berilgan sanani kiriting',
+      toastDebtDueRequired: "To'lash muddatini kiriting",
+      toastDebtDueBeforeIssue: "To'lash muddati berilgan sanadan oldin bo'lishi mumkin emas",
+      toastDebtPhoneRequired: 'Telefon raqamini kiriting',
+      toastDebtPhoneInvalid: "To'g'ri telefon raqamini kiriting (kamida 5 raqam)",
 
     },
     debts: {

@@ -38,7 +38,6 @@ export default function ProductDetail() {
 
   const product = products.find((p) => p.id === id);
   const [inQty, setInQty] = useState('');
-  const [inNote, setInNote] = useState('');
 
   const [editOpen, setEditOpen] = useState(false);
   const [eName, setEName] = useState('');
@@ -150,12 +149,11 @@ export default function ProductDetail() {
       userRole: 'director',
       action: 'Изменение',
       entity: 'Товар',
-      details: `${product.name}: приход +${q}${inNote ? ` (${inNote})` : ''}`,
+      details: `${product.name}: приход +${q}`,
       ip: '—',
     });
     toast.success(t('products.toastInboundOk'));
     setInQty('');
-    setInNote('');
   };
 
   const submitEdit = (e: React.FormEvent) => {
@@ -628,15 +626,6 @@ export default function ProductDetail() {
                 onChange={(e) => setInQty(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2"
                 placeholder="50"
-              />
-            </div>
-            <div className="flex-[2] min-w-[200px]">
-              <label className="block text-sm text-slate-700 mb-1">{t("products.inboundNote")}</label>
-              <input
-                value={inNote}
-                onChange={(e) => setInNote(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                placeholder={t("products.inboundPlaceholder")}
               />
             </div>
             <button type="submit" className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800">

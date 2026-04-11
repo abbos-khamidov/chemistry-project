@@ -110,6 +110,8 @@ export interface User {
     issueDebt?: boolean;
     manageStaff?: boolean;
     viewDebts?: boolean;
+    /** Редактирование карточки должника и истории погашений (только директор или выданное право ассистенту). */
+    editDebtRecords?: boolean;
   };
   status: 'active' | 'inactive';
   lastActivity: string;

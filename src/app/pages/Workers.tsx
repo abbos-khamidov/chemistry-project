@@ -27,6 +27,7 @@ export default function Workers() {
   const [permEditProducts, setPermEditProducts] = useState(true);
   const [permIssueDebt, setPermIssueDebt] = useState(true);
   const [permManageStaff, setPermManageStaff] = useState(false);
+  const [permEditDebtRecords, setPermEditDebtRecords] = useState(false);
   const [permViewDebts, setPermViewDebts] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
@@ -40,6 +41,7 @@ export default function Workers() {
   const [editPermEditProducts, setEditPermEditProducts] = useState(false);
   const [editPermIssueDebt, setEditPermIssueDebt] = useState(false);
   const [editPermManageStaff, setEditPermManageStaff] = useState(false);
+  const [editPermEditDebtRecords, setEditPermEditDebtRecords] = useState(false);
   const [editPermViewDebts, setEditPermViewDebts] = useState(true);
   const [editUsername, setEditUsername] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -74,6 +76,7 @@ export default function Workers() {
     setEditPermEditProducts(Boolean(w.permissions?.editProducts ?? (w.role === 'worker')));
     setEditPermIssueDebt(Boolean(w.permissions?.issueDebt ?? (w.role === 'worker')));
     setEditPermManageStaff(Boolean(w.permissions?.manageStaff));
+    setEditPermEditDebtRecords(Boolean(w.permissions?.editDebtRecords));
     setEditPermViewDebts(Boolean(w.permissions?.viewDebts ?? true));
     setEditUsername(w.username);
     setEditPassword('');
@@ -89,6 +92,7 @@ export default function Workers() {
     setEditPermEditProducts(false);
     setEditPermIssueDebt(false);
     setEditPermManageStaff(false);
+    setEditPermEditDebtRecords(false);
     setEditPermViewDebts(true);
     setEditUsername('');
     setEditPassword('');
@@ -118,6 +122,7 @@ export default function Workers() {
               issueDebt: editPermIssueDebt,
               manageStaff: editPermManageStaff,
               viewDebts: editPermViewDebts,
+              editDebtRecords: editPermEditDebtRecords,
             }
           : {
               analytics: editPermAnalytics,
@@ -164,6 +169,7 @@ export default function Workers() {
         issueDebt: permIssueDebt,
         manageStaff: permManageStaff,
         viewDebts: permViewDebts,
+        editDebtRecords: permEditDebtRecords,
       } : {
         analytics: permAnalytics,
         addProducts: permAddProducts,
@@ -203,6 +209,7 @@ export default function Workers() {
     setPermEditProducts(true);
     setPermIssueDebt(true);
     setPermManageStaff(false);
+    setPermEditDebtRecords(false);
     setPermViewDebts(true);
   };
 
@@ -356,6 +363,12 @@ export default function Workers() {
                       Управление сотрудниками (добавлять, редактировать, отключать)
                     </label>
                   )}
+                  {editRole === 'assistant' && (
+                    <label className="flex items-center gap-3 text-sm text-slate-800">
+                      <input type="checkbox" checked={editPermEditDebtRecords} onChange={(e) => setEditPermEditDebtRecords(e.target.checked)} />
+                      Изменение записей должников (профиль и история оплат)
+                    </label>
+                  )}
                   <label className="flex items-center gap-3 text-sm text-slate-800">
                     <input type="checkbox" checked={editPermViewDebts} onChange={(e) => setEditPermViewDebts(e.target.checked)} />
                     Видимость должников
@@ -500,6 +513,12 @@ export default function Workers() {
                     Управление сотрудниками (добавлять, редактировать, отключать)
                   </label>
                 )}
+                {staffRole === 'assistant' && (
+                  <label className="flex items-center gap-3 text-sm text-slate-800">
+                    <input type="checkbox" checked={permEditDebtRecords} onChange={(e) => setPermEditDebtRecords(e.target.checked)} />
+                    Изменение записей должников (профиль и история оплат)
+                  </label>
+                )}
                 <label className="flex items-center gap-3 text-sm text-slate-800">
                   <input type="checkbox" checked={permViewDebts} onChange={(e) => setPermViewDebts(e.target.checked)} />
                   Видимость должников
@@ -577,6 +596,7 @@ export default function Workers() {
                           {(w.permissions?.editProducts ?? (w.role === 'worker')) && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Изменять товары</span>}
                           {(w.permissions?.issueDebt ?? (w.role === 'worker')) && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Выдача в долг</span>}
                           {w.role === 'assistant' && w.permissions?.manageStaff && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Сотрудники</span>}
+                          {w.role === 'assistant' && w.permissions?.editDebtRecords && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Долги: редактирование</span>}
                           {w.permissions?.viewDebts !== false && <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Должники</span>}
                         </>
                       )}

@@ -25,6 +25,7 @@ export type CreateStaffInput = CreateWorkerInput & {
     issueDebt?: boolean;
     manageStaff?: boolean;
     viewDebts?: boolean;
+    editDebtRecords?: boolean;
   };
 };
 
@@ -399,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               issueDebt: Boolean(input.permissions?.issueDebt),
               manageStaff: Boolean(input.permissions?.manageStaff),
               viewDebts: Boolean(input.permissions?.viewDebts ?? true),
+              editDebtRecords: Boolean(input.permissions?.editDebtRecords),
             }
           : {
               analytics: Boolean(input.permissions?.analytics),
@@ -437,6 +439,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         issueDebt: Boolean(permissions.issueDebt),
         manageStaff: Boolean(permissions.manageStaff),
         viewDebts: Boolean(permissions.viewDebts ?? true),
+        editDebtRecords: Boolean(permissions.editDebtRecords),
       },
     };
     await upsertAccountsToDb(next);
@@ -630,6 +633,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         issueDebt: Boolean(input.permissions?.issueDebt ?? nextAcc.permissions?.issueDebt),
         manageStaff: Boolean(input.permissions?.manageStaff ?? nextAcc.permissions?.manageStaff),
         viewDebts: Boolean(input.permissions?.viewDebts ?? nextAcc.permissions?.viewDebts ?? true),
+        editDebtRecords: Boolean(input.permissions?.editDebtRecords ?? nextAcc.permissions?.editDebtRecords),
       };
     } else {
       nextAcc.permissions = {

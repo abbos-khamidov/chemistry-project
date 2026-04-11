@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router';
 import { toast } from 'sonner';
 import {
@@ -9,28 +9,45 @@ import {
   DollarSign,
   AlertCircle,
   Edit,
-  Printer,
   CheckCircle,
   Building2,
   X,
 } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
-import { canIssueDebt } from '../lib/permissions';
+import { canIssueDebt, canEditDebtRecords } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { debtLineProductName } from '../lib/productLocale';
+import type { DebtHistoryEntry } from '../data/mockData';
 
 const GENERAL_PRODUCT = '__general__';
 const LINE_PREFIX = 'line:';
 
 export default function DebtDetail() {
   const { id } = useParams();
-  const { debts, products, applyDebtPayment, appendAudit } = useWarehouse();
+  const { debts, products, applyDebtPayment, appendAudit, updateDebtorProfile, updateDebtHistoryEntry } =
+    useWarehouse();
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === 'director';
   const canManageDebt = isDirector || canIssueDebt(user);
-  const debt = debts.find((d) => d.id === id);
+  const canEditDebt = canEditDebtRecords(user);
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileFullName, setProfileFullName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileCompany, setProfileCompany] = useState('');
+
+  const [histOpen, setHistOpen] = useState(false);
+  const [histEntryId, setHistEntryId] = useState<string | null>(null);
+  const [histDate, setHistDate] = useState('');
+  const [histPerson, setHistPerson] = useState('');
+  const [histCompany, setHistCompany] = useState('');
+  const [histAmount, setHistAmount] = useState('');
+  const [histProductKey, setHistProductKey] = useState(GENERAL_PRODUCT);
+  const [histMode, setHistMode] = useState<'partial' | 'full'>('partial');
+
+  const debt = useMemo(() => debts.find((d) => d.id === id), [debts, id]);
 
   const [payOpen, setPayOpen] = useState(false);
   const [amountPay, setAmountPay] = useState('');
@@ -107,6 +124,87 @@ export default function DebtDetail() {
     return key;
   };
 
+  const historyProductKey = (h: DebtHistoryEntry) => {
+    if (h.productId === GENERAL_PRODUCT) return GENERAL_PRODUCT;
+    const idx = debt.products.findIndex((p) => p.productId === h.productId);
+    if (idx >= 0) return debt.products.length > 1 ? `${LINE_PREFIX}${idx}` : h.productId;
+    return GENERAL_PRODUCT;
+  };
+
+  const openProfileModal = () => {
+    setProfileFullName(debt.fullName);
+    setProfilePhone(debt.phone);
+    setProfileCompany(debt.company ?? '');
+    setProfileOpen(true);
+  };
+
+  const submitProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !canEditDebt) return;
+    const result = updateDebtorProfile(id, {
+      fullName: profileFullName,
+      phone: profilePhone,
+      company: profileCompany,
+    });
+    if (!result.ok) {
+      toast.error(result.error ?? t('debtDetail.toastPayError'));
+      return;
+    }
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'director',
+      action: 'Изменение',
+      entity: 'Долг',
+      details: `Данные должника обновлены: ${profileFullName.trim()}`,
+      ip: '—',
+    });
+    toast.success(t('debtDetail.profileSaved'));
+    setProfileOpen(false);
+  };
+
+  const openHistModal = (h: DebtHistoryEntry) => {
+    setHistEntryId(h.id);
+    setHistDate(h.date);
+    setHistPerson(h.personName);
+    setHistCompany(h.company);
+    setHistAmount(String(h.amount));
+    setHistProductKey(historyProductKey(h));
+    setHistMode('partial');
+    setHistOpen(true);
+  };
+
+  const submitHistEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !histEntryId || !canEditDebt) return;
+    const base = {
+      date: histDate,
+      personName: histPerson,
+      company: histCompany,
+      productId: resolvePaymentProductId(histProductKey),
+      productName: resolveProductName(histProductKey),
+    };
+    const payload =
+      histMode === 'full'
+        ? { ...base, repaymentMode: 'full' as const }
+        : { ...base, amount: Number(histAmount), repaymentMode: 'partial' as const };
+    const result = updateDebtHistoryEntry(id, histEntryId, payload);
+    if (!result.ok) {
+      toast.error(result.error ?? t('debtDetail.toastPayError'));
+      return;
+    }
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'director',
+      action: 'Изменение',
+      entity: 'Долг',
+      details: `Исправлена запись в истории оплат (${debt.fullName})`,
+      ip: '—',
+    });
+    toast.success(t('debtDetail.historySaved'));
+    setHistOpen(false);
+    setHistEntryId(null);
+  };
+
   const submitPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !canManageDebt) return;
@@ -124,7 +222,7 @@ export default function DebtDetail() {
     }
     appendAudit({
       userName: user?.fullName ?? '—',
-      userRole: (user?.role as any) ?? 'director',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'director',
       action: 'Оплата',
       entity: 'Долг',
       details: `${debt.fullName}: ${amt.toLocaleString()} UZS`,
@@ -149,7 +247,7 @@ export default function DebtDetail() {
         </Link>
         {!canManageDebt && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            Режим просмотра: оплату и изменения вносит директор. Оформление долга выполняется один раз при создании записи.
+            {t('debtDetail.viewOnly')}
           </div>
         )}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -182,25 +280,15 @@ export default function DebtDetail() {
                 <span>Записать оплату</span>
               </button>
             )}
-            {canManageDebt && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => toast.info('Редактирование долга', { description: debt.fullName })}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
-                >
-                  <Edit className="w-4 h-4" />
-                  <span>Изменить</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toast.info('Печать', { description: 'В полной версии — печать счёта.' })}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>Печать</span>
-                </button>
-              </>
+            {canEditDebt && (
+              <button
+                type="button"
+                onClick={openProfileModal}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
+              >
+                <Edit className="w-4 h-4" />
+                <span>{t('debtDetail.editProfile')}</span>
+              </button>
             )}
           </div>
         </div>
@@ -270,6 +358,160 @@ export default function DebtDetail() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setPayOpen(false)} className="px-4 py-2 border rounded-lg">
+                  {t('debtDetail.payCancel')}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  {t('debtDetail.paySave')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {profileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">{t('debtDetail.profileModalTitle')}</h2>
+              <button type="button" onClick={() => setProfileOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitProfile} className="space-y-3">
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.profileName')}</label>
+                <input
+                  required
+                  value={profileFullName}
+                  onChange={(e) => setProfileFullName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.profilePhone')}</label>
+                <input
+                  required
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.profileCompany')}</label>
+                <input
+                  value={profileCompany}
+                  onChange={(e) => setProfileCompany(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setProfileOpen(false)} className="px-4 py-2 border rounded-lg">
+                  {t('debtDetail.payCancel')}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  {t('debtDetail.paySave')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {histOpen && histEntryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">{t('debtDetail.historyEditTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setHistOpen(false);
+                  setHistEntryId(null);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitHistEdit} className="space-y-3">
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.historyDate')}</label>
+                <input
+                  required
+                  type="date"
+                  value={histDate.length >= 10 ? histDate.slice(0, 10) : histDate}
+                  onChange={(e) => setHistDate(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.historyPerson')}</label>
+                <input
+                  value={histPerson}
+                  onChange={(e) => setHistPerson(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.historyCompany')}</label>
+                <input
+                  value={histCompany}
+                  onChange={(e) => setHistCompany(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.repaymentType')}</label>
+                <select
+                  value={histMode}
+                  onChange={(e) => setHistMode(e.target.value as 'partial' | 'full')}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                >
+                  <option value="partial">{t('debtDetail.partialRepayment')}</option>
+                  <option value="full">{t('debtDetail.fullRepayment')}</option>
+                </select>
+              </div>
+              {histMode === 'partial' ? (
+                <div>
+                  <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.historyAmount')}</label>
+                  <input
+                    required
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={histAmount}
+                    onChange={(e) => setHistAmount(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-slate-600">{t('debtDetail.historyFullHint')}</p>
+              )}
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">{t('debtDetail.productRepaymentLabel')}</label>
+                <select
+                  value={histProductKey}
+                  onChange={(e) => setHistProductKey(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                >
+                  <option value={GENERAL_PRODUCT}>{t('debtDetail.generalPayment')}</option>
+                  {debt.products.map((p, idx) => (
+                    <option key={`${p.productId}-${idx}`} value={`${LINE_PREFIX}${idx}`}>
+                      {debtLineProductName(p.productId, p.productName, products, locale)} ({p.quantity} × {p.price.toLocaleString()} UZS)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistOpen(false);
+                    setHistEntryId(null);
+                  }}
+                  className="px-4 py-2 border rounded-lg"
+                >
                   {t('debtDetail.payCancel')}
                 </button>
                 <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
@@ -400,7 +642,7 @@ export default function DebtDetail() {
       <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6 overflow-x-auto">
         <h3 className="font-semibold text-slate-900 mb-4">История погашения долга</h3>
         {history.length > 0 ? (
-          <table className="w-full text-sm min-w-[720px]">
+          <table className="w-full text-sm min-w-[800px]">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-600">
                 <th className="py-2 pr-3 font-medium">Дата</th>
@@ -410,6 +652,7 @@ export default function DebtDetail() {
                 <th className="py-2 pr-3 font-medium">Товар / основание</th>
                 <th className="py-2 pr-3 font-medium text-right">Остаток</th>
                 <th className="py-2 pr-3 font-medium text-right">% оплачено</th>
+                {canEditDebt ? <th className="py-2 pr-3 font-medium text-right">{t('debtDetail.historyActions')}</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -428,6 +671,17 @@ export default function DebtDetail() {
                     )}
                   </td>
                   <td className="py-3 pr-3 text-right font-semibold text-slate-900">{h.paidPercentOfTotal.toFixed(1)}%</td>
+                  {canEditDebt ? (
+                    <td className="py-3 pr-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openHistModal(h)}
+                        className="text-sm font-medium text-slate-700 underline hover:no-underline"
+                      >
+                        {t('debtDetail.historyEditBtn')}
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

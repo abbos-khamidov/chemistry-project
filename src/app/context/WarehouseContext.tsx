@@ -60,6 +60,55 @@ function debtStatusAfterPayment(remaining: number, paid: number, dueDate: string
   return dueDate < today ? 'overdue' : 'active';
 }
 
+function sortDebtHistoryChronological(h: DebtHistoryEntry[]): DebtHistoryEntry[] {
+  return [...h].sort((a, b) => {
+    const c = a.date.localeCompare(b.date);
+    if (c !== 0) return c;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function rebuildDebtFromHistoryEntries(d: Debt, entries: DebtHistoryEntry[]): Debt {
+  const sorted = sortDebtHistoryChronological(entries);
+  let runningPaid = 0;
+  const rebuiltChrono: DebtHistoryEntry[] = [];
+  for (const e of sorted) {
+    const amt = Number(e.amount);
+    if (!Number.isFinite(amt) || amt < 0) {
+      rebuiltChrono.push(e);
+      continue;
+    }
+    runningPaid += amt;
+    const remainingAfter = Math.max(0, d.totalAmount - runningPaid);
+    const paidPercent =
+      d.totalAmount > 0 ? Math.min(100, Math.round((runningPaid / d.totalAmount) * 1000) / 10) : 0;
+    rebuiltChrono.push({
+      ...e,
+      amount: amt,
+      remainingAfter,
+      fullyPaid: remainingAfter <= 0,
+      paidPercentOfTotal: paidPercent,
+    });
+  }
+  const paidAmount = runningPaid;
+  const remainingAmount = Math.max(0, d.totalAmount - paidAmount);
+  const status = debtStatusAfterPayment(remainingAmount, paidAmount, d.dueDate);
+  const newestFirst = [...rebuiltChrono].reverse();
+  const paymentHistory = rebuiltChrono.map((e) => ({
+    date: e.date,
+    amount: e.amount,
+    method: [e.company?.trim(), e.productName?.trim()].filter(Boolean).join(' · ') || 'Оплата',
+  }));
+  return {
+    ...d,
+    paidAmount,
+    remainingAmount,
+    status,
+    debtHistory: newestFirst,
+    paymentHistory,
+  };
+}
+
 type ProductRow = {
   id: string;
   name: string;
@@ -405,6 +454,22 @@ export type DebtPaymentInput = {
   productName: string;
 };
 
+export type UpdateDebtorProfileInput = {
+  fullName?: string;
+  phone?: string;
+  company?: string;
+};
+
+export type UpdateDebtHistoryInput = {
+  date?: string;
+  personName?: string;
+  company?: string;
+  amount?: number;
+  productId?: string;
+  productName?: string;
+  repaymentMode?: 'partial' | 'full';
+};
+
 export type RecordClientSaleInput = {
   productId: string;
   quantity: number;
@@ -422,6 +487,12 @@ type WarehouseContextValue = WarehousePersisted & {
   addProductInbound: (productId: string, quantity: number, userName: string) => boolean;
   addDebt: (debt: Omit<Debt, 'id'>) => { ok: true; debt: Debt } | { ok: false; error: string };
   applyDebtPayment: (debtId: string, input: DebtPaymentInput) => { ok: true } | { ok: false; error: string };
+  updateDebtorProfile: (debtId: string, input: UpdateDebtorProfileInput) => { ok: true } | { ok: false; error: string };
+  updateDebtHistoryEntry: (
+    debtId: string,
+    entryId: string,
+    input: UpdateDebtHistoryInput
+  ) => { ok: true } | { ok: false; error: string };
   recordClientSale: (input: RecordClientSaleInput) => { ok: true } | { ok: false; error: string };
   appendAudit: (entry: Omit<AuditLogEntry, 'id' | 'at'>) => void;
   markAuditRead: (auditId: string) => void;
@@ -727,6 +798,88 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     [commit]
   );
 
+  const updateDebtorProfile = useCallback(
+    (debtId: string, input: UpdateDebtorProfileInput): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      const d = prev.debts.find((x) => x.id === debtId);
+      if (!d) return { ok: false, error: 'Долг не найден' };
+      const next: Debt = {
+        ...d,
+        ...(input.fullName !== undefined && { fullName: input.fullName.trim() }),
+        ...(input.phone !== undefined && { phone: input.phone.trim() }),
+        ...(input.company !== undefined && { company: input.company.trim() || undefined }),
+      };
+      commit({
+        ...prev,
+        debts: prev.debts.map((x) => (x.id === debtId ? next : x)),
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
+  const updateDebtHistoryEntry = useCallback(
+    (
+      debtId: string,
+      entryId: string,
+      input: UpdateDebtHistoryInput
+    ): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      const d = prev.debts.find((x) => x.id === debtId);
+      if (!d) return { ok: false, error: 'Долг не найден' };
+      const list = d.debtHistory ?? [];
+      if (!list.some((e) => e.id === entryId)) return { ok: false, error: 'Запись не найдена' };
+
+      let merged = list.map((e) => {
+        if (e.id !== entryId) return e;
+        return {
+          ...e,
+          ...(input.date !== undefined && { date: input.date }),
+          ...(input.personName !== undefined && { personName: input.personName }),
+          ...(input.company !== undefined && { company: input.company }),
+          ...(input.productId !== undefined && { productId: input.productId }),
+          ...(input.productName !== undefined && { productName: input.productName }),
+        };
+      });
+
+      const sorted = sortDebtHistoryChronological(merged);
+      const pos = sorted.findIndex((e) => e.id === entryId);
+      if (pos === -1) return { ok: false, error: 'Запись не найдена' };
+
+      const paidBefore = sorted.slice(0, pos).reduce((sum, e) => sum + Number(e.amount), 0);
+      const remainingBefore = Math.max(0, d.totalAmount - paidBefore);
+
+      let nextAmount = Number(sorted[pos].amount);
+      if (input.repaymentMode === 'full') {
+        nextAmount = remainingBefore;
+      } else if (input.amount !== undefined) {
+        nextAmount = input.amount;
+      }
+
+      if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+        return { ok: false, error: 'Некорректная сумма' };
+      }
+      if (nextAmount > remainingBefore + 0.01) {
+        return { ok: false, error: 'Сумма больше остатка на момент этой операции' };
+      }
+
+      merged = merged.map((e) => (e.id === entryId ? { ...e, amount: nextAmount } : e));
+
+      const totalPaid = sortDebtHistoryChronological(merged).reduce((sum, e) => sum + Number(e.amount), 0);
+      if (totalPaid > d.totalAmount + 0.01) {
+        return { ok: false, error: 'Сумма оплат не может превышать сумму долга' };
+      }
+
+      const updated = rebuildDebtFromHistoryEntries(d, merged);
+      commit({
+        ...prev,
+        debts: prev.debts.map((x) => (x.id === debtId ? updated : x)),
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
   const recordClientSale = useCallback(
     (input: RecordClientSaleInput): { ok: true } | { ok: false; error: string } => {
       const qty = Number(input.quantity);
@@ -804,6 +957,8 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       addProductInbound,
       addDebt,
       applyDebtPayment,
+      updateDebtorProfile,
+      updateDebtHistoryEntry,
       recordClientSale,
       appendAudit,
       markAuditRead,
@@ -817,6 +972,8 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       addProductInbound,
       addDebt,
       applyDebtPayment,
+      updateDebtorProfile,
+      updateDebtHistoryEntry,
       recordClientSale,
       appendAudit,
       markAuditRead,

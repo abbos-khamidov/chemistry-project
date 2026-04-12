@@ -22,3 +22,13 @@ export function formatDateDotDMY(raw: string): string {
   if (dotted) return `${dotted[3]}.${dotted[2]}.${dotted[1]}`;
   return raw;
 }
+
+/** Журнал аудита: «YYYY-MM-DD HH:MM» → «DD.MM.YYYY HH:MM» (время сохраняется). */
+export function formatAuditAtDisplay(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](.+))?$/.exec(raw.trim());
+  if (!m) return formatDateDotDMY(raw);
+  const dmy = `${m[3]}.${m[2]}.${m[1]}`;
+  const rest = m[4]?.trim();
+  return rest ? `${dmy} ${rest}` : dmy;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveProductStatus, dateInRange, formatDateDotDMY } from './warehouseUtils';
+import { deriveProductStatus, dateInRange, formatDateDotDMY, formatAuditAtDisplay } from './warehouseUtils';
 
 describe('warehouseUtils', () => {
   it('deriveProductStatus reflects quantity bands', () => {
@@ -16,6 +16,11 @@ describe('warehouseUtils', () => {
   it('formatDateDotDMY converts ISO and dotted dates to DD.MM.YYYY', () => {
     expect(formatDateDotDMY('2026-05-01')).toBe('01.05.2026');
     expect(formatDateDotDMY('2026.04.12')).toBe('12.04.2026');
+  });
+
+  it('formatAuditAtDisplay converts audit timestamps to DD.MM.YYYY HH:MM', () => {
+    expect(formatAuditAtDisplay('2026-04-12 10:55')).toBe('12.04.2026 10:55');
+    expect(formatAuditAtDisplay('2026-01-02')).toBe('02.01.2026');
   });
 
 });

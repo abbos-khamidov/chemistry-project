@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { canIssueDebt, canEditDebtRecords } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { debtLineProductName } from '../lib/productLocale';
+import { formatDateDotDMY } from '../lib/warehouseUtils';
 import type { DebtHistoryEntry } from '../data/mockData';
 
 const GENERAL_PRODUCT = '__general__';
@@ -28,12 +29,12 @@ const LINE_PREFIX = 'line:';
 
 export default function DebtDetail() {
   const { id } = useParams();
-  const { debts, products, applyDebtPayment, appendAudit, updateDebtorProfile, updateDebtHistoryEntry } =
+  const { debts, products, applyDebtPayment, appendAudit, updateDebtorProfile, updateDebtHistoryEntry, updateDebtSchedule } =
     useWarehouse();
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const isDirector = user?.role === 'director';
-  const canManageDebt = isDirector || canIssueDebt(user);
+  const canManageDebt = isDirector || canIssueDebt(user) || canEditDebtRecords(user);
   const canEditDebt = canEditDebtRecords(user);
 
   const [profileOpen, setProfileOpen] = useState(false);
@@ -56,6 +57,10 @@ export default function DebtDetail() {
   const [amountPay, setAmountPay] = useState('');
   const [paymentMode, setPaymentMode] = useState<'partial' | 'full'>('partial');
   const [productKey, setProductKey] = useState(GENERAL_PRODUCT);
+
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [schedIssue, setSchedIssue] = useState('');
+  const [schedDue, setSchedDue] = useState('');
 
   if (!debt) {
     return (
@@ -213,6 +218,26 @@ export default function DebtDetail() {
     setHistEntryId(null);
   };
 
+  const submitSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !canEditDebt) return;
+    const result = updateDebtSchedule(id, { issueDate: schedIssue, dueDate: schedDue });
+    if (!result.ok) {
+      toast.error(result.error ?? t('debtDetail.toastPayError'));
+      return;
+    }
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'director',
+      action: 'Изменение',
+      entity: 'Долг',
+      details: `Сроки долга обновлены: ${debt.fullName}`,
+      ip: '—',
+    });
+    toast.success(t('debtDetail.profileSaved'));
+    setScheduleOpen(false);
+  };
+
   const submitPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !canManageDebt) return;
@@ -296,6 +321,20 @@ export default function DebtDetail() {
               >
                 <Edit className="w-4 h-4" />
                 <span>{t('debtDetail.editProfile')}</span>
+              </button>
+            )}
+            {canEditDebt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSchedIssue(debt.issueDate.slice(0, 10));
+                  setSchedDue(debt.dueDate.slice(0, 10));
+                  setScheduleOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Сроки оплаты</span>
               </button>
             )}
           </div>
@@ -412,6 +451,49 @@ export default function DebtDetail() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setProfileOpen(false)} className="px-4 py-2 border rounded-lg">
+                  {t('debtDetail.payCancel')}
+                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
+                  {t('debtDetail.paySave')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {scheduleOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Сроки долга</h2>
+              <button type="button" onClick={() => setScheduleOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={submitSchedule} className="space-y-3">
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Дата выдачи</label>
+                <input
+                  required
+                  type="date"
+                  value={schedIssue}
+                  onChange={(e) => setSchedIssue(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Срок оплаты</label>
+                <input
+                  required
+                  type="date"
+                  value={schedDue}
+                  onChange={(e) => setSchedDue(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setScheduleOpen(false)} className="px-4 py-2 border rounded-lg">
                   {t('debtDetail.payCancel')}
                 </button>
                 <button type="submit" className="px-4 py-2 bg-slate-700 text-white rounded-lg">
@@ -594,11 +676,11 @@ export default function DebtDetail() {
         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
           <div>
             <p className="text-sm text-slate-600">Дата выдачи</p>
-            <p className="font-medium text-slate-900">{debt.issueDate}</p>
+            <p className="font-medium text-slate-900">{formatDateDotDMY(debt.issueDate)}</p>
           </div>
           <div>
             <p className="text-sm text-slate-600">Срок оплаты</p>
-            <p className="font-medium text-slate-900">{debt.dueDate}</p>
+            <p className="font-medium text-slate-900">{formatDateDotDMY(debt.dueDate)}</p>
           </div>
         </div>
       </div>
@@ -660,7 +742,7 @@ export default function DebtDetail() {
             <tbody className="divide-y divide-slate-100">
               {history.map((h) => (
                 <tr key={h.id} className="text-slate-800">
-                  <td className="py-3 pr-3 whitespace-nowrap">{h.date}</td>
+                  <td className="py-3 pr-3 whitespace-nowrap">{formatDateDotDMY(h.date)}</td>
                   <td className="py-3 pr-3">{h.personName}</td>
                   <td className="py-3 pr-3">{h.company}</td>
                   <td className="py-3 pr-3 text-right font-medium text-emerald-700">+{h.amount.toLocaleString()}</td>

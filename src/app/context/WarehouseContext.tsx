@@ -411,6 +411,11 @@ export type UpdateDebtorProfileInput = {
   company?: string;
 };
 
+export type UpdateDebtScheduleInput = {
+  issueDate?: string;
+  dueDate?: string;
+};
+
 export type UpdateDebtHistoryInput = {
   date?: string;
   personName?: string;
@@ -428,7 +433,7 @@ export type RecordClientSaleInput = {
   phone?: string;
   company?: string;
   createdByUserId?: string;
-  createdByRole: 'director' | 'worker';
+  createdByRole: 'director' | 'assistant' | 'worker';
 };
 
 type WarehouseContextValue = WarehousePersisted & {
@@ -439,6 +444,7 @@ type WarehouseContextValue = WarehousePersisted & {
   addDebt: (debt: Omit<Debt, 'id'>) => { ok: true; debt: Debt } | { ok: false; error: string };
   applyDebtPayment: (debtId: string, input: DebtPaymentInput) => { ok: true } | { ok: false; error: string };
   updateDebtorProfile: (debtId: string, input: UpdateDebtorProfileInput) => { ok: true } | { ok: false; error: string };
+  updateDebtSchedule: (debtId: string, input: UpdateDebtScheduleInput) => { ok: true } | { ok: false; error: string };
   updateDebtHistoryEntry: (
     debtId: string,
     entryId: string,
@@ -599,7 +605,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       const updated: Product = {
         ...p,
         name: input.name ?? p.name,
-        imageUrl: input.imageUrl !== undefined ? input.imageUrl : p.imageUrl,
+        imageUrl: 'imageUrl' in input ? input.imageUrl : p.imageUrl,
         category: input.category ?? p.category,
         categoryUz: input.categoryUz !== undefined ? input.categoryUz : p.categoryUz,
         quantity,
@@ -767,6 +773,30 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     [commit]
   );
 
+  const updateDebtSchedule = useCallback(
+    (debtId: string, input: UpdateDebtScheduleInput): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      const d = prev.debts.find((x) => x.id === debtId);
+      if (!d) return { ok: false, error: 'Долг не найден' };
+      const issueDate = (input.issueDate ?? d.issueDate).trim().slice(0, 10);
+      const dueDate = (input.dueDate ?? d.dueDate).trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(issueDate) || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+        return { ok: false, error: 'Укажите даты в формате ГГГГ-ММ-ДД' };
+      }
+      if (dueDate < issueDate) {
+        return { ok: false, error: 'Срок оплаты не может быть раньше даты выдачи' };
+      }
+      const status = debtStatusAfterPayment(d.remainingAmount, d.paidAmount, dueDate);
+      const next: Debt = { ...d, issueDate, dueDate, status };
+      commit({
+        ...prev,
+        debts: prev.debts.map((x) => (x.id === debtId ? next : x)),
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
   const updateDebtHistoryEntry = useCallback(
     (
       debtId: string,
@@ -907,6 +937,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       addDebt,
       applyDebtPayment,
       updateDebtorProfile,
+      updateDebtSchedule,
       updateDebtHistoryEntry,
       recordClientSale,
       appendAudit,
@@ -922,6 +953,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       addDebt,
       applyDebtPayment,
       updateDebtorProfile,
+      updateDebtSchedule,
       updateDebtHistoryEntry,
       recordClientSale,
       appendAudit,

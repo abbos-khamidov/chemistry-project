@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { UserPlus, Copy, Users, UserX, Trash2, UserCheck, KeyRound } from 'lucide-react';
+import { UserPlus, Copy, Users, UserX, Trash2, UserCheck, KeyRound, AlertCircle } from 'lucide-react';
 import type { User } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { canManageStaff } from '../lib/permissions';
 import { PhoneField } from '../components/PhoneField';
-import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { formatInternationalPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
@@ -21,6 +21,7 @@ export default function Workers() {
   const { appendAudit } = useWarehouse();
   const { t } = useI18n();
   const allowManageStaff = canManageStaff(user);
+  const isDirectorUser = user?.role === 'director';
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
@@ -64,6 +65,11 @@ export default function Workers() {
     setEditPermEditProducts(true);
     setEditPermIssueDebt(true);
   }, [editRole]);
+
+  useEffect(() => {
+    if (isDirectorUser) return;
+    if (staffRole === 'assistant') setStaffRole('worker');
+  }, [isDirectorUser, staffRole]);
 
   const sortedWorkers = [...workers].sort((a, b) => {
     if (a.status === b.status) return a.fullName.localeCompare(b.fullName, 'ru');
@@ -170,6 +176,10 @@ export default function Workers() {
     e.preventDefault();
     if (!allowManageStaff) {
       toast.error('Недостаточно прав');
+      return;
+    }
+    if (staffRole === 'assistant' && !isDirectorUser) {
+      toast.error('Только директор может создавать учётки ассистентов');
       return;
     }
     const pn = normalizePhoneForStore(phone);
@@ -325,7 +335,7 @@ export default function Workers() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40">
           <form
             onSubmit={handleEditSave}
-            className="bg-white rounded-xl border border-slate-200 shadow-lg max-w-md w-full p-6">
+            className="bg-white rounded-xl border border-slate-200 shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-1">Редактирование учётки</h2>
             <p className="text-sm text-slate-600 mb-4">{editWorker.fullName}</p>
             <p className="text-xs text-slate-500 mb-4">Измените данные сотрудника, роль и права доступа.</p>
@@ -361,14 +371,20 @@ export default function Workers() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Роль</label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as 'worker' | 'assistant')}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
-                >
-                  <option value="worker">Рабочий</option>
-                  <option value="assistant">Ассистент директора</option>
-                </select>
+                {isDirectorUser ? (
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as 'worker' | 'assistant')}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
+                  >
+                    <option value="worker">Рабочий</option>
+                    <option value="assistant">Ассистент директора</option>
+                  </select>
+                ) : (
+                  <p className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 bg-slate-50">
+                    {editWorker.role === 'assistant' ? 'Ассистент директора' : 'Рабочий'}
+                  </p>
+                )}
               </div>
               {(editRole === 'assistant' || editRole === 'worker') && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
@@ -514,7 +530,7 @@ export default function Workers() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
               >
                 <option value="worker">Рабочий</option>
-                <option value="assistant">Ассистент директора</option>
+                {isDirectorUser ? <option value="assistant">Ассистент директора</option> : null}
               </select>
             </div>
 
@@ -601,7 +617,15 @@ export default function Workers() {
                   <div>
                     <p className="font-medium text-slate-900">{w.fullName}</p>
                     <p className="text-sm text-slate-600">@{w.username}</p>
-                    <p className="text-xs text-slate-500">{w.phone}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs text-slate-500">{formatInternationalPhoneDisplay(w.phone)}</p>
+                      {!isCompleteInternationalPhone12(normalizePhoneForStore(w.phone)) && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title={t('common.phoneInvalid12')}>
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          Номер
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className={`text-xs px-2 py-1 rounded-full ${w.role === 'assistant' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
                         {w.role === 'assistant' ? 'Ассистент директора' : 'Рабочий'}

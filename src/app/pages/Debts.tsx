@@ -14,6 +14,7 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { debtLineProductName } from '../lib/productLocale';
+import { formatDateDotDMY } from '../lib/warehouseUtils';
 
 export default function Debts() {
   const { debts, products } = useWarehouse();
@@ -177,7 +178,7 @@ export default function Debts() {
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {t('debts.dueLabel')}: {debt.dueDate}
+                        {t('debts.dueLabel')}: {formatDateDotDMY(debt.dueDate)}
                       </span>
                     </div>
                   </div>

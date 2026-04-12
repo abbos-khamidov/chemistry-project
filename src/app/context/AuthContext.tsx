@@ -394,6 +394,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (input.password.length < 4) {
       return { ok: false, error: 'Пароль не короче 4 символов' };
     }
+    if (input.role === 'assistant' && director?.role !== 'director') {
+      return { ok: false, error: 'Только директор может создавать учётки ассистентов' };
+    }
     const role: 'worker' | 'assistant' = input.role;
     const acc: StoredAccount = {
       id: crypto.randomUUID(),
@@ -618,6 +621,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const acc = list[idx];
     const nextAcc: StoredAccount = { ...acc };
+
+    const isPromotingToAssistant = input.role === 'assistant' && acc.role !== 'assistant';
+    if (isPromotingToAssistant && director?.role !== 'director') {
+      return { ok: false, error: 'Только директор может назначать роль ассистента' };
+    }
 
     if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
     if (input.phone !== undefined) {

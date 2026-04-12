@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
+import { formatDateDotDMY } from '../lib/warehouseUtils';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
 import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
@@ -356,7 +357,7 @@ export default function ProductDetail() {
       return;
     }
     const sp = normalizePhoneForStore(sPhone);
-    if (sp && !isCompleteInternationalPhone12(sp)) {
+    if (!isCompleteInternationalPhone12(sp)) {
       toast.error(t('common.phoneInvalid12'));
       return;
     }
@@ -365,10 +366,10 @@ export default function ProductDetail() {
       productId: product.id,
       quantity: qty,
       fullName: sName.trim(),
-      phone: sp || undefined,
+      phone: sp,
       company: sCompany.trim() || undefined,
       createdByUserId: user?.id,
-      createdByRole: (user?.role as any) ?? 'worker',
+      createdByRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'worker',
     });
     if (!result.ok) {
       toast.error(result.error);
@@ -752,7 +753,7 @@ export default function ProductDetail() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">{t("products.goodUntil")}</p>
-                <p className="text-sm font-medium text-slate-900">{product.expirationDate}</p>
+                <p className="text-sm font-medium text-slate-900">{formatDateDotDMY(product.expirationDate)}</p>
               </div>
             </div>
           </div>
@@ -959,6 +960,7 @@ export default function ProductDetail() {
                     label={t('debts.phone')}
                     value={sPhone}
                     onChange={setSPhone}
+                    required
                     inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                   />
                 </div>
@@ -1031,7 +1033,7 @@ export default function ProductDetail() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-slate-600">{entry.date}</p>
+                    <p className="text-sm text-slate-600">{formatDateDotDMY(entry.date)}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{t("products.historyUser")}: {entry.user}</p>
                   </div>
                 </div>

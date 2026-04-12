@@ -131,6 +131,7 @@ type DebtRow = {
   full_name: string;
   phone: string;
   company: string | null;
+  created_at?: string | null;
   created_by_role: Debt['createdByRole'] | null;
   created_by_user_id: string | null;
   total_amount: string | number;
@@ -183,7 +184,7 @@ async function loadFromDb(): Promise<WarehousePersisted> {
     readsRes,
   ] = await Promise.all([
     supabase.from('products').select('*'),
-    supabase.from('debts').select('*'),
+    supabase.from('debts').select('*').order('created_at', { ascending: false }),
     supabase.from('client_sales').select('*'),
     supabase.from('audit_log').select('*').order('at', { ascending: false }),
     userId ? supabase.from('audit_reads').select('audit_id').eq('user_id', userId) : Promise.resolve({ data: [], error: null }),
@@ -218,6 +219,7 @@ async function loadFromDb(): Promise<WarehousePersisted> {
       fullName: r.full_name,
       phone: r.phone,
       company: r.company ?? undefined,
+      createdAt: r.created_at ? new Date(r.created_at as string).toISOString() : undefined,
       createdByRole: r.created_by_role ?? undefined,
       createdByUserId: r.created_by_user_id ?? undefined,
       totalAmount: Number(r.total_amount ?? 0),
@@ -289,6 +291,7 @@ function toDebtRows(debts: Debt[]): DebtRow[] {
     full_name: d.fullName,
     phone: d.phone,
     company: d.company ?? null,
+    created_at: d.createdAt ?? `${d.issueDate}T12:00:00.000Z`,
     created_by_role: d.createdByRole ?? null,
     created_by_user_id: d.createdByUserId ?? null,
     total_amount: d.totalAmount,
@@ -681,6 +684,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         debtHistory: input.debtHistory ?? [],
         paymentHistory: input.paymentHistory ?? [],
         id: uid(),
+        createdAt: new Date().toISOString(),
       };
 
       const today = new Date().toISOString().slice(0, 10);
@@ -704,7 +708,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         };
       });
 
-      commit({ ...prev, products: updatedProducts, debts: [...prev.debts, debt] });
+      commit({ ...prev, products: updatedProducts, debts: [debt, ...prev.debts] });
       return { ok: true, debt };
     },
     [commit]

@@ -23,7 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
-import { formatDateDotDMY } from '../lib/warehouseUtils';
+import { compareDebtsNewestFirst, formatDateDotDMY } from '../lib/warehouseUtils';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
 import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
@@ -811,7 +811,7 @@ export default function ProductDetail() {
                   className="w-full border border-slate-300 rounded-lg px-3 py-2"
                 >
                   <option value="">{t('products.debtorSelectPlaceholder')}</option>
-                  {debts.map((d) => (
+                  {[...debts].sort(compareDebtsNewestFirst).map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.fullName} · {formatPhoneDisplay(d.phone)}
                       {d.company ? ` · ${d.company}` : ''}

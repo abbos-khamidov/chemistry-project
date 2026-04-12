@@ -1,4 +1,4 @@
-import type { Product } from '../data/mockData';
+import type { Debt, Product } from '../data/mockData';
 
 export function deriveProductStatus(quantity: number): Product['status'] {
   if (quantity <= 0) return 'out-of-stock';
@@ -32,3 +32,13 @@ export function formatAuditAtDisplay(raw: string): string {
   const rest = m[4]?.trim();
   return rest ? `${dmy} ${rest}` : dmy;
 }
+
+/** Новые должники выше старых: по времени создания записи, иначе по дате выдачи и id. */
+export function compareDebtsNewestFirst(a: Debt, b: Debt): number {
+  const ka = a.createdAt ?? `${a.issueDate}T00:00:00.000Z`;
+  const kb = b.createdAt ?? `${b.issueDate}T00:00:00.000Z`;
+  const c = kb.localeCompare(ka);
+  if (c !== 0) return c;
+  return b.id.localeCompare(a.id);
+}
+

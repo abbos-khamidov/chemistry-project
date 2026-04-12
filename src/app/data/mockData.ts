@@ -65,6 +65,8 @@ export interface Debt {
   id: string;
   fullName: string;
   phone: string;
+  /** ISO время создания записи долга (сортировка: новые сверху). */
+  createdAt?: string;
   /** Компания должника */
   company?: string;
   /** Кто оформил: рабочий не может менять долг после сохранения (только просмотр) */

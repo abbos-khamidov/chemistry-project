@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import {
   Search,
@@ -14,7 +14,7 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { debtLineProductName } from '../lib/productLocale';
-import { formatDateDotDMY } from '../lib/warehouseUtils';
+import { compareDebtsNewestFirst, formatDateDotDMY } from '../lib/warehouseUtils';
 import { formatPhoneDisplay } from '../lib/phone';
 
 export default function Debts() {
@@ -26,14 +26,17 @@ export default function Debts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredDebts = debts.filter((debt) => {
-    const matchesSearch =
-      debt.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      debt.phone.includes(searchQuery) ||
-      (debt.company ?? '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || debt.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredDebts = useMemo(() => {
+    const rows = debts.filter((debt) => {
+      const matchesSearch =
+        debt.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        debt.phone.includes(searchQuery) ||
+        (debt.company ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || debt.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+    return [...rows].sort(compareDebtsNewestFirst);
+  }, [debts, searchQuery, statusFilter]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

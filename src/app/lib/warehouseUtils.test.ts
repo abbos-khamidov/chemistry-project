@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveProductStatus, dateInRange, formatDateDotDMY, formatAuditAtDisplay, compareDebtsNewestFirst } from './warehouseUtils';
+import { deriveProductStatus, dateInRange, formatDateDotDMY, formatAuditAtDisplay, compareDebtsNewestFirst, compareClientSalesNewestFirst } from './warehouseUtils';
 
 describe('warehouseUtils', () => {
   it('deriveProductStatus reflects quantity bands', () => {
@@ -56,6 +56,33 @@ describe('warehouseUtils', () => {
     };
     expect(compareDebtsNewestFirst(a, b)).toBeGreaterThan(0);
     expect(compareDebtsNewestFirst(b, a)).toBeLessThan(0);
+  });
+
+  it('compareClientSalesNewestFirst orders by createdAt within same calendar date', () => {
+    const a = {
+      id: 'a',
+      fullName: 'First',
+      phone: '+998901111111',
+      productId: 'p',
+      productName: 'X',
+      quantity: 1,
+      amountUzs: 100,
+      date: '2026-04-12',
+      createdAt: '2026-04-12T08:00:00.000Z',
+    };
+    const b = {
+      id: 'b',
+      fullName: 'Second',
+      phone: '+998902222222',
+      productId: 'p',
+      productName: 'X',
+      quantity: 1,
+      amountUzs: 100,
+      date: '2026-04-12',
+      createdAt: '2026-04-12T18:00:00.000Z',
+    };
+    expect(compareClientSalesNewestFirst(a, b)).toBeGreaterThan(0);
+    expect(compareClientSalesNewestFirst(b, a)).toBeLessThan(0);
   });
 
 });

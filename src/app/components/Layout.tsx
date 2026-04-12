@@ -19,7 +19,7 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { getPermissions } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
-import { compareDebtsNewestFirst } from '../lib/warehouseUtils';
+import { compareClientSalesNewestFirst, compareDebtsNewestFirst } from '../lib/warehouseUtils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { BrandLogo } from './BrandLogo';
 import { NotificationsPopover } from './NotificationsPopover';
@@ -123,7 +123,7 @@ export default function Layout() {
       }
     }
 
-    for (const c of clientSales) {
+    for (const c of [...clientSales].sort(compareClientSalesNewestFirst)) {
       const blob = [c.fullName, c.phone, c.productName, c.company ?? ''].join(' ').toLowerCase();
       if (blob.includes(q)) {
         out.push({ key: `c:${c.id}`, title: c.fullName, subtitle: `${t('layout.navClients')} · ${c.productName}`, to: '/clients' });

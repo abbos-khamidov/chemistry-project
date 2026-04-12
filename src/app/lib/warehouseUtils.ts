@@ -1,4 +1,4 @@
-import type { Debt, Product } from '../data/mockData';
+import type { ClientSale, Debt, Product } from '../data/mockData';
 
 export function deriveProductStatus(quantity: number): Product['status'] {
   if (quantity <= 0) return 'out-of-stock';
@@ -37,6 +37,15 @@ export function formatAuditAtDisplay(raw: string): string {
 export function compareDebtsNewestFirst(a: Debt, b: Debt): number {
   const ka = a.createdAt ?? `${a.issueDate}T00:00:00.000Z`;
   const kb = b.createdAt ?? `${b.issueDate}T00:00:00.000Z`;
+  const c = kb.localeCompare(ka);
+  if (c !== 0) return c;
+  return b.id.localeCompare(a.id);
+}
+
+/** Новые продажи/клиенты в списке выше старых (по времени записи, не только по календарной дате). */
+export function compareClientSalesNewestFirst(a: ClientSale, b: ClientSale): number {
+  const ka = a.createdAt ?? `${a.date}T00:00:00.000Z`;
+  const kb = b.createdAt ?? `${b.date}T00:00:00.000Z`;
   const c = kb.localeCompare(ka);
   if (c !== 0) return c;
   return b.id.localeCompare(a.id);

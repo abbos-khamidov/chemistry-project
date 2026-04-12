@@ -156,6 +156,7 @@ type ClientSaleRow = {
   quantity: number;
   amount_uzs: string | number;
   date: string;
+  created_at?: string | null;
   created_by_user_id: string | null;
   created_by_role: ClientSale['createdByRole'] | null;
 };
@@ -171,10 +172,11 @@ type AuditLogRow = {
   ip: string;
 };
 
-async function loadFromDb(): Promise<WarehousePersisted> {
-  if (!isSupabaseConfigured) return empty();
+async function loadFromDb(fallback: WarehousePersisted): Promise<WarehousePersisted> {
+  if (!isSupabaseConfigured) return fallback;
 
   const userId = getSessionUserIdFromCookie();
+  const fb = fallback;
 
   const [
     productsRes,
@@ -183,9 +185,9 @@ async function loadFromDb(): Promise<WarehousePersisted> {
     auditRes,
     readsRes,
   ] = await Promise.all([
-    supabase.from('products').select('*'),
+    supabase.from('products').select('*').order('created_at', { ascending: true }),
     supabase.from('debts').select('*').order('created_at', { ascending: false }),
-    supabase.from('client_sales').select('*'),
+    supabase.from('client_sales').select('*').order('created_at', { ascending: false }),
     supabase.from('audit_log').select('*').order('at', { ascending: false }),
     userId ? supabase.from('audit_reads').select('audit_id').eq('user_id', userId) : Promise.resolve({ data: [], error: null }),
   ]);
@@ -194,73 +196,84 @@ async function loadFromDb(): Promise<WarehousePersisted> {
   logSupabaseError('debts select failed', debtsRes.error);
   logSupabaseError('client_sales select failed', salesRes.error);
   logSupabaseError('audit_log select failed', auditRes.error);
-  logSupabaseError('audit_reads select failed', (readsRes as any).error);
+  logSupabaseError('audit_reads select failed', (readsRes as { error?: unknown }).error);
 
-  const products = ((productsRes.data as ProductRow[] | null) ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    imageUrl: r.image_url ?? undefined,
-    category: r.category,
-    categoryUz: r.category_uz ?? undefined,
-    quantity: Number(r.quantity ?? 0),
-    unit: r.unit,
-    price: Number(r.price ?? 0),
-    supplier: r.supplier,
-    expirationDate: r.expiration_date,
-    status: (r.status as Product['status']) ?? 'in-stock',
-    notes: r.notes ?? undefined,
-    shipmentRecipient: r.shipment_recipient ?? undefined,
-    history: Array.isArray(r.history) ? r.history : [],
-  }));
+  const products = productsRes.error
+    ? fb.products
+    : ((productsRes.data as ProductRow[] | null) ?? []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        imageUrl: r.image_url ?? undefined,
+        category: r.category,
+        categoryUz: r.category_uz ?? undefined,
+        quantity: Number(r.quantity ?? 0),
+        unit: r.unit,
+        price: Number(r.price ?? 0),
+        supplier: r.supplier,
+        expirationDate: r.expiration_date,
+        status: (r.status as Product['status']) ?? 'in-stock',
+        notes: r.notes ?? undefined,
+        shipmentRecipient: r.shipment_recipient ?? undefined,
+        history: Array.isArray(r.history) ? r.history : [],
+      }));
 
-  const debts = ((debtsRes.data as DebtRow[] | null) ?? []).map((r) =>
-    normalizeDebt({
-      id: r.id,
-      fullName: r.full_name,
-      phone: r.phone,
-      company: r.company ?? undefined,
-      createdAt: r.created_at ? new Date(r.created_at as string).toISOString() : undefined,
-      createdByRole: r.created_by_role ?? undefined,
-      createdByUserId: r.created_by_user_id ?? undefined,
-      totalAmount: Number(r.total_amount ?? 0),
-      paidAmount: Number(r.paid_amount ?? 0),
-      remainingAmount: Number(r.remaining_amount ?? 0),
-      issueDate: r.issue_date,
-      dueDate: r.due_date,
-      status: r.status,
-      products: Array.isArray(r.products) ? r.products : [],
-      notes: r.notes ?? undefined,
-      debtHistory: Array.isArray(r.debt_history) ? r.debt_history : [],
-      paymentHistory: Array.isArray(r.payment_history) ? r.payment_history : [],
-    })
-  );
+  const debts = debtsRes.error
+    ? fb.debts
+    : ((debtsRes.data as DebtRow[] | null) ?? []).map((r) =>
+        normalizeDebt({
+          id: r.id,
+          fullName: r.full_name,
+          phone: r.phone,
+          company: r.company ?? undefined,
+          createdAt: r.created_at ? new Date(r.created_at as string).toISOString() : undefined,
+          createdByRole: r.created_by_role ?? undefined,
+          createdByUserId: r.created_by_user_id ?? undefined,
+          totalAmount: Number(r.total_amount ?? 0),
+          paidAmount: Number(r.paid_amount ?? 0),
+          remainingAmount: Number(r.remaining_amount ?? 0),
+          issueDate: r.issue_date,
+          dueDate: r.due_date,
+          status: r.status,
+          products: Array.isArray(r.products) ? r.products : [],
+          notes: r.notes ?? undefined,
+          debtHistory: Array.isArray(r.debt_history) ? r.debt_history : [],
+          paymentHistory: Array.isArray(r.payment_history) ? r.payment_history : [],
+        })
+      );
 
-  const clientSales = ((salesRes.data as ClientSaleRow[] | null) ?? []).map((r) => ({
-    id: r.id,
-    fullName: r.full_name,
-    phone: r.phone,
-    company: r.company ?? undefined,
-    productId: r.product_id,
-    productName: r.product_name,
-    quantity: Number(r.quantity ?? 0),
-    amountUzs: Number(r.amount_uzs ?? 0),
-    date: r.date,
-    createdByUserId: r.created_by_user_id ?? undefined,
-    createdByRole: r.created_by_role ?? undefined,
-  }));
+  const clientSales = salesRes.error
+    ? fb.clientSales
+    : ((salesRes.data as ClientSaleRow[] | null) ?? []).map((r) => ({
+        id: r.id,
+        fullName: r.full_name,
+        phone: r.phone,
+        company: r.company ?? undefined,
+        productId: r.product_id,
+        productName: r.product_name,
+        quantity: Number(r.quantity ?? 0),
+        amountUzs: Number(r.amount_uzs ?? 0),
+        date: r.date,
+        createdAt: r.created_at ? new Date(r.created_at as string).toISOString() : undefined,
+        createdByUserId: r.created_by_user_id ?? undefined,
+        createdByRole: r.created_by_role ?? undefined,
+      }));
 
-  const auditLog = ((auditRes.data as AuditLogRow[] | null) ?? []).map((r) => ({
-    id: r.id,
-    at: r.at,
-    userName: r.user_name,
-    userRole: r.user_role,
-    action: r.action,
-    entity: r.entity,
-    details: r.details,
-    ip: r.ip,
-  }));
+  const auditLog = auditRes.error
+    ? fb.auditLog
+    : ((auditRes.data as AuditLogRow[] | null) ?? []).map((r) => ({
+        id: r.id,
+        at: r.at,
+        userName: r.user_name,
+        userRole: r.user_role,
+        action: r.action,
+        entity: r.entity,
+        details: r.details,
+        ip: r.ip,
+      }));
 
-  const readAuditIds = (((readsRes as any).data as Array<{ audit_id: string }> | null) ?? []).map((r) => r.audit_id);
+  const readAuditIds = (readsRes as { error?: unknown }).error
+    ? fb.readAuditIds
+    : (((readsRes as any).data as Array<{ audit_id: string }> | null) ?? []).map((r) => r.audit_id);
 
   return { products, debts, clientSales, auditLog, readAuditIds };
 }
@@ -318,6 +331,7 @@ function toClientSaleRows(rows: ClientSale[]): ClientSaleRow[] {
     quantity: r.quantity,
     amount_uzs: r.amountUzs,
     date: r.date,
+    created_at: r.createdAt ?? `${r.date}T12:00:00.000Z`,
     created_by_user_id: r.createdByUserId ?? null,
     created_by_role: r.createdByRole ?? null,
   }));
@@ -471,12 +485,20 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    (async () => {
-      const loaded = await loadFromDb();
-      if (!active) return;
-      dataRef.current = loaded;
-      setData(loaded);
-    })();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let reloadSeq = 0;
+
+    const pull = (fb: WarehousePersisted) => {
+      const seq = ++reloadSeq;
+      void loadFromDb(fb).then((loaded) => {
+        if (!active) return;
+        if (seq !== reloadSeq) return;
+        dataRef.current = loaded;
+        setData(loaded);
+      });
+    };
+
+    pull(empty());
 
     if (!isSupabaseConfigured) {
       return () => {
@@ -484,36 +506,25 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       };
     }
 
+    const schedulePull = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        pull(dataRef.current);
+      }, 320);
+    };
+
     const channel = supabase
       .channel('warehouse-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
-        const loaded = await loadFromDb();
-        if (!active) return;
-        dataRef.current = loaded;
-        setData(loaded);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, async () => {
-        const loaded = await loadFromDb();
-        if (!active) return;
-        dataRef.current = loaded;
-        setData(loaded);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_sales' }, async () => {
-        const loaded = await loadFromDb();
-        if (!active) return;
-        dataRef.current = loaded;
-        setData(loaded);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, async () => {
-        const loaded = await loadFromDb();
-        if (!active) return;
-        dataRef.current = loaded;
-        setData(loaded);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, schedulePull)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, schedulePull)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_sales' }, schedulePull)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, schedulePull)
       .subscribe();
 
     return () => {
       active = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -904,6 +915,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         quantity: qty,
         amountUzs,
         date: today,
+        createdAt: new Date().toISOString(),
         createdByUserId: input.createdByUserId,
         createdByRole: input.createdByRole,
       };

@@ -56,7 +56,10 @@ export interface ClientSale {
   productName: string;
   quantity: number;
   amountUzs: number;
+  /** День продажи (учёт). */
   date: string;
+  /** Время создания записи (сортировка «новые сверху», несколько сделок в один день). */
+  createdAt?: string;
   createdByUserId?: string;
   createdByRole?: 'director' | 'assistant' | 'worker';
 }

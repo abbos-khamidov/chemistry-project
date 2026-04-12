@@ -4,7 +4,7 @@ import { Search, UserCircle, Package } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
-import { formatDateDotDMY } from '../lib/warehouseUtils';
+import { compareClientSalesNewestFirst, formatDateDotDMY } from '../lib/warehouseUtils';
 import { formatPhoneDisplay } from '../lib/phone';
 
 export default function Clients() {
@@ -14,7 +14,7 @@ export default function Clients() {
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
-    const list = [...(clientSales ?? [])].sort((a, b) => (a.date < b.date ? 1 : -1));
+    const list = [...(clientSales ?? [])].sort(compareClientSalesNewestFirst);
     if (!s) return list;
     return list.filter((r) => {
       const blob = [r.fullName, r.phone, r.productName, r.company ?? ''].join(' ').toLowerCase();

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
+import { formatAuditAtDisplay } from '../lib/warehouseUtils';
 
 const MAX_ITEMS = 50;
 
@@ -82,7 +83,7 @@ export function NotificationsPopover() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">{r.at}</p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">{formatAuditAtDisplay(r.at)}</p>
                           <p className="font-medium text-slate-900 dark:text-slate-100 mt-0.5">{r.userName}</p>
                           <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                             <span className="font-medium">{r.action}</span>

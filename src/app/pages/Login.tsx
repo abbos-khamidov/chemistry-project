@@ -5,6 +5,7 @@ import { Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { BrandLogo } from '../components/BrandLogo';
+import { getHomePath } from '../lib/permissions';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -16,8 +17,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!user) return;
-    const target = user.role === 'director' ? '/analytics' : '/products';
-    navigate(target, { replace: true });
+    navigate(getHomePath(user), { replace: true });
   }, [user, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -28,8 +28,7 @@ export default function Login() {
       setError(result.error ?? t('login.errorGeneric'));
       return;
     }
-    const target = result.role === 'director' ? '/analytics' : '/products';
-    navigate(target, { replace: true });
+    navigate(result.redirectTo ?? '/products', { replace: true });
   };
 
   return (

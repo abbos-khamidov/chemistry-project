@@ -46,6 +46,14 @@ export function formatInternationalPhoneDisplay(compact: string): string {
   return typer.input(s);
 }
 
+/** Телефон в списках и карточках: международное форматирование с пробелами (libphonenumber). */
+export function formatPhoneDisplay(raw: string | undefined | null): string {
+  if (raw == null) return '';
+  const s = String(raw).trim();
+  if (s === '' || s === '—' || s === '-') return s;
+  return formatInternationalPhoneDisplay(s);
+}
+
 export function getDetectedCountry(e164compact: string): CountryCode | undefined {
   const p = parsePhoneNumberFromString(e164compact);
   return p?.country;

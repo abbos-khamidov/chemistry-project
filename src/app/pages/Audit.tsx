@@ -2,6 +2,7 @@ import { Search, Filter } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
+import { formatAuditAtDisplay } from '../lib/warehouseUtils';
 
 export default function Audit() {
   const { auditLog } = useWarehouse();
@@ -72,7 +73,7 @@ export default function Audit() {
             <tbody className="divide-y divide-slate-100">
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{r.at}</td>
+                  <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{formatAuditAtDisplay(r.at)}</td>
                   <td className="py-3 px-4 font-medium text-slate-900">{r.userName}</td>
                   <td className="py-3 px-4">
                     <span

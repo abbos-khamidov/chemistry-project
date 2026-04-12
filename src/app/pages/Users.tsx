@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatPhoneDisplay } from '../lib/phone';
 import { toast } from 'sonner';
 import { Plus, Search, Filter, Users as UsersIcon, Edit, UserX, UserCheck } from 'lucide-react';
 import { mockUsers } from '../data/mockData';
@@ -167,7 +168,7 @@ export default function Users() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{user.phone}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{formatPhoneDisplay(user.phone)}</td>
                   <td className="px-6 py-4">
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getRoleColor(user.role)}`}>
                       {getRoleLabel(user.role)}

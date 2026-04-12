@@ -12,3 +12,23 @@ export function dateInRange(dateStr: string, start: string, end: string): boolea
   return d >= start && d <= end;
 }
 
+/** Отображение даты: YYYY-MM-DD или YYYY.MM.DD → DD.MM.YYYY */
+export function formatDateDotDMY(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const s = raw.trim().slice(0, 10);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (iso) return `${iso[3]}.${iso[2]}.${iso[1]}`;
+  const dotted = /^(\d{4})\.(\d{2})\.(\d{2})$/.exec(s);
+  if (dotted) return `${dotted[3]}.${dotted[2]}.${dotted[1]}`;
+  return raw;
+}
+
+/** Журнал аудита: «YYYY-MM-DD HH:MM» → «DD.MM.YYYY HH:MM» (время сохраняется). */
+export function formatAuditAtDisplay(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](.+))?$/.exec(raw.trim());
+  if (!m) return formatDateDotDMY(raw);
+  const dmy = `${m[3]}.${m[2]}.${m[1]}`;
+  const rest = m[4]?.trim();
+  return rest ? `${dmy} ${rest}` : dmy;
+}

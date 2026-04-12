@@ -8,6 +8,7 @@ import { canAddProducts } from '../lib/permissions';
 import { useI18n } from "../i18n/I18nContext";
 import { productName } from "../lib/productLocale";
 import { AmountField } from "../components/AmountField";
+import { formatDateDotDMY } from "../lib/warehouseUtils";
 
 const MAX_IMAGE_BYTES = 600 * 1024;
 
@@ -395,6 +396,10 @@ export default function Products() {
                   <span className="text-slate-600">{t("products.colSupplier")}:</span>
                   <span className="font-medium text-slate-900 truncate ml-2">{product.supplier}</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">{t("products.labelExp")}:</span>
+                  <span className="font-medium text-slate-900">{formatDateDotDMY(product.expirationDate)}</span>
+                </div>
               </div>
 
               {product.status === "low-stock" && (
@@ -426,6 +431,7 @@ export default function Products() {
                                     <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colQtyShort")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colPrice")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colSupplier")}</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.labelExp")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase">{t("products.colStatus")}</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-600 uppercase"></th>
                 </tr>
@@ -442,6 +448,7 @@ export default function Products() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-900">{product.price.toLocaleString()} UZS</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{product.supplier}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{formatDateDotDMY(product.expirationDate)}</td>
                     <td className="px-6 py-4">
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusColor(product.status)}`}>
                         {getStatusLabel(product.status)}

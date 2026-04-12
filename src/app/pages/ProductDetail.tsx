@@ -23,9 +23,10 @@ import { useAuth } from '../context/AuthContext';
 import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
+import { formatDateDotDMY } from '../lib/warehouseUtils';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
-import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 const MAX_IMAGE_BYTES = 600 * 1024;
 
 
@@ -38,6 +39,8 @@ export default function ProductDetail() {
   const isDirector = user?.role === 'director';
   const canEdit = canEditProducts(user);
   const canDebt = canIssueDebt(user);
+  /** Приход на склад — то же право, что и редактирование карточки товара. */
+  const canInbound = canEditProducts(user);
 
   const product = products.find((p) => p.id === id);
   const [inQty, setInQty] = useState('');
@@ -136,20 +139,20 @@ export default function ProductDetail() {
 
   const handleInbound = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isDirector) return;
+    if (!canInbound) return;
     const q = Number(inQty);
     if (!Number.isFinite(q) || q <= 0) {
       toast.error(t('products.toastQty'));
       return;
     }
-    const ok = addProductInbound(product.id, q, user?.fullName ?? 'Директор');
+    const ok = addProductInbound(product.id, q, user?.fullName ?? '—');
     if (!ok) {
       toast.error(t('products.toastInboundFail'));
       return;
     }
     appendAudit({
-      userName: user?.fullName ?? 'Директор',
-      userRole: 'director',
+      userName: user?.fullName ?? '—',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'worker',
       action: 'Изменение',
       entity: 'Товар',
       details: `${product.name}: приход +${q}`,
@@ -356,7 +359,7 @@ export default function ProductDetail() {
       return;
     }
     const sp = normalizePhoneForStore(sPhone);
-    if (sp && !isCompleteInternationalPhone12(sp)) {
+    if (!isCompleteInternationalPhone12(sp)) {
       toast.error(t('common.phoneInvalid12'));
       return;
     }
@@ -365,10 +368,10 @@ export default function ProductDetail() {
       productId: product.id,
       quantity: qty,
       fullName: sName.trim(),
-      phone: sp || undefined,
+      phone: sp,
       company: sCompany.trim() || undefined,
       createdByUserId: user?.id,
-      createdByRole: (user?.role as any) ?? 'worker',
+      createdByRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'worker',
     });
     if (!result.ok) {
       toast.error(result.error);
@@ -566,7 +569,7 @@ export default function ProductDetail() {
             </div>
             <div>
               <dt className="text-slate-500">{t("debts.phone")}</dt>
-              <dd className="font-medium text-slate-900">{r.phone}</dd>
+              <dd className="font-medium text-slate-900">{formatPhoneDisplay(r.phone)}</dd>
             </div>
             <div>
               <dt className="text-slate-500">{t("debtDetail.company")}</dt>
@@ -610,7 +613,7 @@ export default function ProductDetail() {
       </div>
 
 
-      {isDirector && (
+      {canInbound ? (
         <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6">
           <h2 className="font-semibold text-slate-900 mb-4">{t("products.inboundTitle")}</h2>
           <p className="text-sm text-slate-600 mb-4">
@@ -633,6 +636,11 @@ export default function ProductDetail() {
               {t("products.inboundSubmit")}
             </button>
           </form>
+        </div>
+      ) : (
+        <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-6 mb-6">
+          <h2 className="font-semibold text-slate-900 mb-2">{t("products.inboundTitle")}</h2>
+          <p className="text-sm text-slate-600">{t("products.inboundDeniedHint")}</p>
         </div>
       )}
 
@@ -752,7 +760,7 @@ export default function ProductDetail() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">{t("products.goodUntil")}</p>
-                <p className="text-sm font-medium text-slate-900">{product.expirationDate}</p>
+                <p className="text-sm font-medium text-slate-900">{formatDateDotDMY(product.expirationDate)}</p>
               </div>
             </div>
           </div>
@@ -805,7 +813,7 @@ export default function ProductDetail() {
                   <option value="">{t('products.debtorSelectPlaceholder')}</option>
                   {debts.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.fullName} · {d.phone}
+                      {d.fullName} · {formatPhoneDisplay(d.phone)}
                       {d.company ? ` · ${d.company}` : ''}
                     </option>
                   ))}
@@ -959,6 +967,7 @@ export default function ProductDetail() {
                     label={t('debts.phone')}
                     value={sPhone}
                     onChange={setSPhone}
+                    required
                     inputClassName="w-full border border-slate-300 rounded-lg px-3 py-2"
                   />
                 </div>
@@ -1031,7 +1040,7 @@ export default function ProductDetail() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-slate-600">{entry.date}</p>
+                    <p className="text-sm text-slate-600">{formatDateDotDMY(entry.date)}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{t("products.historyUser")}: {entry.user}</p>
                   </div>
                 </div>

@@ -3,11 +3,12 @@ import type { User } from '../data/mockData';
 import { clearSessionCookie, getSessionUserIdFromCookie, setSessionCookie } from '../lib/sessionCookie';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { getHomePath } from '../lib/permissions';
 
 const STORAGE_SESSION_LEGACY = 'warehouse-auth-session-v2';
 
 type AuthResult =
-  | { ok: true; role: 'director' | 'assistant' | 'worker' }
+  | { ok: true; role: 'director' | 'assistant' | 'worker'; redirectTo?: string }
   | { ok: false; error?: string };
 
 export type CreateWorkerInput = {
@@ -294,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const publicUser = stripPassword(acc);
       setUser(publicUser);
       persistSession(publicUser);
-      return { ok: true, role: acc.role };
+      return { ok: true, role: acc.role, redirectTo: getHomePath(publicUser) };
     },
     [persistSession, reloadAccounts]
   );
@@ -393,6 +394,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (input.password.length < 4) {
       return { ok: false, error: 'Пароль не короче 4 символов' };
+    }
+    if (input.role === 'assistant' && director?.role !== 'director') {
+      return { ok: false, error: 'Только директор может создавать учётки ассистентов' };
     }
     const role: 'worker' | 'assistant' = input.role;
     const acc: StoredAccount = {
@@ -618,6 +622,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const acc = list[idx];
     const nextAcc: StoredAccount = { ...acc };
+
+    const isPromotingToAssistant = input.role === 'assistant' && acc.role !== 'assistant';
+    if (isPromotingToAssistant && director?.role !== 'director') {
+      return { ok: false, error: 'Только директор может назначать роль ассистента' };
+    }
 
     if (input.fullName !== undefined) nextAcc.fullName = input.fullName.trim();
     if (input.phone !== undefined) {

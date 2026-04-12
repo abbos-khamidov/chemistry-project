@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, ClientSale } from '../data/mockData';
+import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import { deriveProductStatus } from '../lib/warehouseUtils';
 import { getSessionUserIdFromCookie } from '../lib/sessionCookie';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -430,7 +431,7 @@ export type RecordClientSaleInput = {
   productId: string;
   quantity: number;
   fullName: string;
-  phone?: string;
+  phone: string;
   company?: string;
   createdByUserId?: string;
   createdByRole: 'director' | 'assistant' | 'worker';
@@ -666,8 +667,17 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const debtorPhoneNorm = normalizePhoneForStore(input.phone);
+      if (!isCompleteInternationalPhone12(debtorPhoneNorm)) {
+        return {
+          ok: false,
+          error: 'Номер: знак + и ровно 12 цифр (без букв). Страна определяется автоматически.',
+        };
+      }
+
       const debt: Debt = {
         ...input,
+        phone: debtorPhoneNorm,
         debtHistory: input.debtHistory ?? [],
         paymentHistory: input.paymentHistory ?? [],
         id: uid(),
@@ -865,6 +875,13 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       if (!Number.isInteger(qty) || qty <= 0) {
         return { ok: false, error: 'Количество должно быть целым числом больше 0' };
       }
+      const salePhoneNorm = normalizePhoneForStore(input.phone);
+      if (!isCompleteInternationalPhone12(salePhoneNorm)) {
+        return {
+          ok: false,
+          error: 'Номер: знак + и ровно 12 цифр (без букв). Страна определяется автоматически.',
+        };
+      }
       const prev = dataRef.current;
       const p = prev.products.find((x) => x.id === input.productId);
       if (!p) return { ok: false, error: 'Товар не найден' };
@@ -876,7 +893,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       const sale: ClientSale = {
         id: uid(),
         fullName: input.fullName.trim(),
-        phone: (input.phone ?? '').trim() || '—',
+        phone: salePhoneNorm,
         company: input.company?.trim() || undefined,
         productId: p.id,
         productName: p.name,

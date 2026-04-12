@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
 import { format, eachMonthOfInterval, parseISO } from 'date-fns';
-import { ru } from 'date-fns/locale/ru';
-import { uz } from 'date-fns/locale/uz';
 import { Calendar, TrendingUp, TrendingDown, Banknote, Package, FileText } from 'lucide-react';
 import {
   LineChart,
@@ -19,6 +17,28 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { dateInRange } from '../lib/warehouseUtils';
 
+/** Короткие подписи на оси Y для крупных сумм (UZS), без обрезания в контейнере. */
+function compactAxisUzs(n: number): string {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '0';
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return `${(v / 1e9).toFixed(1).replace(/\.0$/, '')} млрд`;
+  if (abs >= 1e6) return `${(v / 1e6).toFixed(1).replace(/\.0$/, '')} млн`;
+  if (abs >= 1e3) return `${Math.round(v / 1e3)} тыс.`;
+  return String(Math.round(v));
+}
+
+function compactAxisOps(n: number): string {
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return '0';
+  if (v >= 1_000_000) return `${(v / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+  if (v >= 1000) return `${Math.round(v / 1000)}k`;
+  return String(v);
+}
+
+const CHART_MARGIN = { top: 8, right: 12, left: 16, bottom: 8 };
+const Y_AXIS_WIDTH = 88;
+
 function defaultRange() {
   const end = new Date();
   const start = new Date();
@@ -31,8 +51,7 @@ function defaultRange() {
 
 export default function Analytics() {
   const { products, debts, clientSales } = useWarehouse();
-  const { t, formatUzs, locale } = useI18n();
-  const dateFnsLocale = useMemo(() => (locale === 'uz' ? uz : ru), [locale]);
+  const { t, formatUzs } = useI18n();
   const dr = defaultRange();
   const [startDate, setStartDate] = useState(dr.start);
   const [endDate, setEndDate] = useState(dr.end);
@@ -90,7 +109,7 @@ export default function Analytics() {
           }
         }
         return {
-          month: format(m, 'LLL yy', { locale: dateFnsLocale }),
+          month: format(m, 'yyyy-MM-dd'),
           value: valueDelta,
           operations,
         };
@@ -98,7 +117,7 @@ export default function Analytics() {
     } catch {
       return [];
     }
-  }, [products, startDate, endDate, dateFnsLocale]);
+  }, [products, startDate, endDate]);
 
   const debtAnalytics = useMemo(() => {
     try {
@@ -123,12 +142,12 @@ export default function Analytics() {
             unpaid += d.remainingAmount;
           }
         }
-        return { month: format(m, 'LLL yy', { locale: dateFnsLocale }), paid, unpaid };
+        return { month: format(m, 'yyyy-MM-dd'), paid, unpaid };
       });
     } catch {
       return [];
     }
-  }, [debts, startDate, endDate, dateFnsLocale]);
+  }, [debts, startDate, endDate]);
 
   const topProducts = useMemo(() => {
     return [...products]
@@ -233,10 +252,10 @@ export default function Analytics() {
             <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartInventoryEmpty')}</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyInventoryData}>
+              <LineChart data={monthlyInventoryData} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
+                <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickMargin={8} angle={-12} textAnchor="end" height={56} />
+                <YAxis stroke="#64748b" fontSize={11} width={Y_AXIS_WIDTH} tickFormatter={compactAxisUzs} />
                 <Tooltip
                   formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
@@ -254,6 +273,7 @@ export default function Analytics() {
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <RechartsBar
+              margin={CHART_MARGIN}
               data={[
                 {
                   month: t('analytics.periodLabel'),
@@ -263,8 +283,8 @@ export default function Analytics() {
               ]}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
+              <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
+              <YAxis stroke="#64748b" fontSize={11} width={Y_AXIS_WIDTH} tickFormatter={compactAxisUzs} />
               <Tooltip
                 formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
@@ -287,10 +307,10 @@ export default function Analytics() {
             <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartDebtsEmpty')}</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <RechartsBar data={debtAnalytics}>
+              <RechartsBar margin={CHART_MARGIN} data={debtAnalytics}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
+                <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickMargin={8} angle={-12} textAnchor="end" height={56} />
+                <YAxis stroke="#64748b" fontSize={11} width={Y_AXIS_WIDTH} tickFormatter={compactAxisUzs} />
                 <Tooltip
                   formatter={(v: number) => [formatUzs(Number(v)), t('analytics.tooltipValue')]}
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
@@ -312,10 +332,10 @@ export default function Analytics() {
             <p className="text-slate-600 text-sm py-8 text-center">{t('analytics.chartDebtsEmpty')}</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <RechartsBar data={monthlyInventoryData}>
+              <RechartsBar margin={CHART_MARGIN} data={monthlyInventoryData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
+                <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickMargin={8} angle={-12} textAnchor="end" height={56} />
+                <YAxis stroke="#64748b" fontSize={11} width={Y_AXIS_WIDTH} allowDecimals={false} tickFormatter={compactAxisOps} />
                 <Tooltip
                   formatter={(v: number) => [String(v), t('analytics.tooltipOps')]}
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}

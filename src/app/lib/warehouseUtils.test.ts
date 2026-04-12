@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { deriveProductStatus, dateInRange, formatDateDotDMY, formatAuditAtDisplay, compareDebtsNewestFirst, compareClientSalesNewestFirst } from './warehouseUtils';
+import type { Product } from '../data/mockData';
+import { deriveProductStatus, dateInRange, formatDateDotDMY, formatAuditAtDisplay, compareDebtsNewestFirst, compareClientSalesNewestFirst, daysLeftUntilExpiration, getProductsExpiringWithinDays } from './warehouseUtils';
 
 describe('warehouseUtils', () => {
   it('deriveProductStatus reflects quantity bands', () => {
@@ -83,6 +84,46 @@ describe('warehouseUtils', () => {
     };
     expect(compareClientSalesNewestFirst(a, b)).toBeGreaterThan(0);
     expect(compareClientSalesNewestFirst(b, a)).toBeLessThan(0);
+  });
+
+  it('daysLeftUntilExpiration counts calendar days to expiration', () => {
+    const now = new Date(2026, 3, 12, 10, 0, 0);
+    expect(daysLeftUntilExpiration('2026-05-12', now)).toBe(30);
+    expect(daysLeftUntilExpiration('2026-04-13', now)).toBe(1);
+    expect(daysLeftUntilExpiration('2026-04-12', now)).toBe(0);
+  });
+
+  it('getProductsExpiringWithinDays lists in-stock products in window', () => {
+    const now = new Date(2026, 3, 12, 12, 0, 0);
+    const products: Product[] = [
+      {
+        id: 'a',
+        name: 'A',
+        category: 'c',
+        quantity: 5,
+        unit: 'шт',
+        price: 1,
+        supplier: 's',
+        expirationDate: '2026-05-10',
+        status: 'in-stock',
+        history: [],
+      },
+      {
+        id: 'b',
+        name: 'B',
+        category: 'c',
+        quantity: 0,
+        unit: 'шт',
+        price: 1,
+        supplier: 's',
+        expirationDate: '2026-05-10',
+        status: 'out-of-stock',
+        history: [],
+      },
+    ];
+    const rows = getProductsExpiringWithinDays(products, 30, now);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].product.id).toBe('a');
   });
 
 });

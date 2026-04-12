@@ -51,3 +51,44 @@ export function compareClientSalesNewestFirst(a: ClientSale, b: ClientSale): num
   return b.id.localeCompare(a.id);
 }
 
+/** Срок годности в формате YYYY-MM-DD (из поля товара). */
+export function parseExpirationDateYmd(raw: string | undefined | null): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const s = raw.trim().slice(0, 10);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dotted = /^(\d{4})\.(\d{2})\.(\d{2})$/.exec(s);
+  if (dotted) return `${dotted[1]}-${dotted[2]}-${dotted[3]}`;
+  return null;
+}
+
+/** Целое число дней от сегодня до даты окончания (положительное — ещё не истёк). */
+export function daysLeftUntilExpiration(expirationRaw: string, now = new Date()): number | null {
+  const ymd = parseExpirationDateYmd(expirationRaw);
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const end = new Date(y, m - 1, d, 12, 0, 0);
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  return Math.round((end.getTime() - start.getTime()) / 86400000);
+}
+
+/** Товары с остатком, у которых до конца срока годности не больше `withinDays` дней (и срок ещё не прошёл). */
+export function getProductsExpiringWithinDays(
+  products: Product[],
+  withinDays: number,
+  now = new Date()
+): Array<{ product: Product; daysLeft: number }> {
+  const out: Array<{ product: Product; daysLeft: number }> = [];
+  for (const p of products) {
+    if (!p.quantity || p.quantity <= 0) continue;
+    const days = daysLeftUntilExpiration(p.expirationDate, now);
+    if (days === null) continue;
+    if (days > 0 && days <= withinDays) {
+      out.push({ product: p, daysLeft: days });
+    }
+  }
+  out.sort((a, b) => a.daysLeft - b.daysLeft);
+  return out;
+}
+

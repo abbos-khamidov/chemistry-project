@@ -1,23 +1,128 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bell } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router';
+import { Bell, AlertTriangle } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
+import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
-import { formatAuditAtDisplay } from '../lib/warehouseUtils';
+import { productName } from '../lib/productLocale';
+import { canAddProducts, canEditProducts } from '../lib/permissions';
+import {
+  formatAuditAtDisplay,
+  formatDateDotDMY,
+  getProductsExpiringWithinDays,
+  parseExpirationDateYmd,
+} from '../lib/warehouseUtils';
 
 const MAX_ITEMS = 50;
+const EXPIRY_WINDOW_DAYS = 30;
+const MAX_EXPIRY_ITEMS = 30;
+const EXPIRY_READ_STORAGE = 'warehouse-expiry-read-v1';
+
+function loadExpiryReadSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(EXPIRY_READ_STORAGE);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as unknown;
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveExpiryReadSet(next: Set<string>) {
+  try {
+    localStorage.setItem(EXPIRY_READ_STORAGE, JSON.stringify([...next]));
+  } catch {
+    /* ignore */
+  }
+}
+
+function expiryDismissKey(productId: string, expirationYmd: string) {
+  return `${productId}|${expirationYmd}`;
+}
 
 export function NotificationsPopover() {
-  const { auditLog, readAuditIds, markAuditRead, markAllAuditRead } = useWarehouse();
-  const { t } = useI18n();
+  const { products, auditLog, readAuditIds, markAuditRead, markAllAuditRead } = useWarehouse();
+  const { user } = useAuth();
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
+  const [expiryReadBump, setExpiryReadBump] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const rows = useMemo(() => auditLog.slice(0, MAX_ITEMS), [auditLog]);
+  const showExpiryAlerts = Boolean(user && (canEditProducts(user) || canAddProducts(user)));
+
+  const expiryReadSet = useMemo(() => {
+    void expiryReadBump;
+    return loadExpiryReadSet();
+  }, [expiryReadBump]);
+
+  const expiring = useMemo(() => {
+    if (!showExpiryAlerts) return [];
+    return getProductsExpiringWithinDays(products, EXPIRY_WINDOW_DAYS);
+  }, [products, showExpiryAlerts]);
+
+  const expiryRows = useMemo(() => {
+    return expiring.map(({ product, daysLeft }) => {
+      const ymd = parseExpirationDateYmd(product.expirationDate) ?? '';
+      const key = expiryDismissKey(product.id, ymd);
+      return {
+        kind: 'expiry' as const,
+        product,
+        daysLeft,
+        ymd,
+        key,
+        read: expiryReadSet.has(key),
+      };
+    });
+  }, [expiring, expiryReadSet]);
+
+  const expiryShown = expiryRows.slice(0, MAX_EXPIRY_ITEMS);
+  const auditSlots = Math.max(0, MAX_ITEMS - expiryShown.length);
+  const auditRows = auditLog.slice(0, auditSlots);
+
+  const displayedRows = useMemo(() => {
+    type Row =
+      | { kind: 'expiry'; key: string; read: boolean; product: (typeof expiryRows)[0]['product']; daysLeft: number }
+      | { kind: 'audit'; key: string; read: boolean; entry: (typeof auditLog)[0] };
+    const out: Row[] = expiryShown.map((e) => ({
+      kind: 'expiry',
+      key: e.key,
+      read: e.read,
+      product: e.product,
+      daysLeft: e.daysLeft,
+    }));
+    for (const entry of auditRows) {
+      out.push({
+        kind: 'audit',
+        key: entry.id,
+        read: readAuditIds.includes(entry.id),
+        entry,
+      });
+    }
+    return out;
+  }, [expiryShown, auditRows, readAuditIds]);
 
   const unreadCount = useMemo(
-    () => rows.filter((r) => !readAuditIds.includes(r.id)).length,
-    [rows, readAuditIds]
+    () => displayedRows.filter((r) => !r.read).length,
+    [displayedRows]
   );
+
+  const dismissExpiryOne = useCallback((key: string) => {
+    const s = loadExpiryReadSet();
+    s.add(key);
+    saveExpiryReadSet(s);
+    setExpiryReadBump((b) => b + 1);
+  }, []);
+
+  const markAllReadCombined = useCallback(() => {
+    markAllAuditRead();
+    const s = loadExpiryReadSet();
+    for (const e of expiryShown) {
+      s.add(e.key);
+    }
+    saveExpiryReadSet(s);
+    setExpiryReadBump((b) => b + 1);
+  }, [markAllAuditRead, expiryShown]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -59,7 +164,7 @@ export function NotificationsPopover() {
               {unreadCount > 0 && (
                 <button
                   type="button"
-                  onClick={markAllAuditRead}
+                  onClick={markAllReadCombined}
                   className="shrink-0 text-xs font-medium text-slate-700 dark:text-slate-200 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
                   {t('notifications.markAllRead')}
@@ -68,17 +173,65 @@ export function NotificationsPopover() {
             </div>
           </div>
           <div className="overflow-y-auto flex-1 p-2">
-            {rows.length === 0 ? (
+            {displayedRows.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400 px-2 py-6 text-center">{t('notifications.empty')}</p>
             ) : (
               <ul className="space-y-1">
-                {rows.map((r) => {
-                  const read = readAuditIds.includes(r.id);
+                {displayedRows.map((row) => {
+                  if (row.kind === 'expiry') {
+                    const name = productName(row.product, locale);
+                    const dateStr = formatDateDotDMY(row.product.expirationDate);
+                    const details = t('notifications.expiryLine')
+                      .replace('{name}', name)
+                      .replace('{days}', String(row.daysLeft))
+                      .replace('{date}', dateStr);
+                    return (
+                      <li
+                        key={row.key}
+                        className={`rounded-lg border text-left p-3 text-sm ${
+                          row.read
+                            ? 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900'
+                            : 'border-amber-200 dark:border-amber-800/50 bg-amber-50/70 dark:bg-amber-900/25'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1 flex gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium text-amber-800 dark:text-amber-200/90">
+                                {t('notifications.expiryKind')}
+                              </p>
+                              <p className="text-xs text-slate-700 dark:text-slate-200 mt-1 break-words">{details}</p>
+                              <Link
+                                to={`/products/${row.product.id}`}
+                                className="inline-block mt-2 text-xs font-medium text-slate-700 dark:text-slate-200 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white"
+                                onClick={() => setOpen(false)}
+                              >
+                                {t('notifications.openProduct')}
+                              </Link>
+                            </div>
+                          </div>
+                          {!row.read && (
+                            <button
+                              type="button"
+                              onClick={() => dismissExpiryOne(row.key)}
+                              className="shrink-0 text-xs font-medium text-slate-700 dark:text-slate-200 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+                            >
+                              {t('notifications.markRead')}
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  }
+                  const r = row.entry;
                   return (
                     <li
                       key={r.id}
                       className={`rounded-lg border text-left p-3 text-sm ${
-                        read ? 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900' : 'border-amber-100 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/20'
+                        row.read
+                          ? 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900'
+                          : 'border-amber-100 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/20'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -94,7 +247,7 @@ export function NotificationsPopover() {
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 break-words">{r.details}</p>
                           ) : null}
                         </div>
-                        {!read && (
+                        {!row.read && (
                           <button
                             type="button"
                             onClick={() => markAuditRead(r.id)}

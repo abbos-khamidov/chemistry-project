@@ -137,10 +137,13 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     },
     notifications: {
       title: 'Уведомления',
-      subtitle: 'Последние действия в системе',
+      subtitle: 'Действия в системе и сроки годности (до 30 дней)',
       empty: 'Пока нет записей — появятся после действий.',
       markRead: 'Прочитано',
       markAllRead: 'Прочитать все',
+      expiryKind: 'Срок годности',
+      expiryLine: '«{name}»: осталось {days} дн. · до {date}',
+      openProduct: 'Карточка товара',
     },
     audit: {
       pageTitle: 'Журнал аудита',
@@ -535,10 +538,13 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
     },
     notifications: {
       title: 'Bildirishnomalar',
-      subtitle: "So'nggi harakatlar",
+      subtitle: 'Tizimdagi harakatlar va yaroqlilik muddati (30 kungacha)',
       empty: "Hozircha yozuv yo'q.",
       markRead: "O'qilgan",
       markAllRead: "Hammasini o'qish",
+      expiryKind: 'Yaroqlilik muddati',
+      expiryLine: '«{name}»: {days} kun qoldi · {date} gacha',
+      openProduct: 'Mahsulot kartasi',
     },
     audit: {
       pageTitle: 'Audit jurnali',

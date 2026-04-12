@@ -5,7 +5,7 @@ import { ArrowRight, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { PhoneField } from './PhoneField';
-import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import {
   Dialog,
   DialogContent,
@@ -235,7 +235,7 @@ export function ProfileDialog({ open, onOpenChange, onLogout }: Props) {
               </p>
               <p>
                 <span className="text-slate-500">{t('workers.phone')}: </span>
-                <span className="text-slate-900">{user.phone}</span>
+                <span className="text-slate-900">{formatPhoneDisplay(user.phone)}</span>
               </p>
               <p>
                 <span className="text-slate-500">{t('workers.login')}: </span>

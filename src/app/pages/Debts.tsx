@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { debtLineProductName } from '../lib/productLocale';
 import { formatDateDotDMY } from '../lib/warehouseUtils';
+import { formatPhoneDisplay } from '../lib/phone';
 
 export default function Debts() {
   const { debts, products } = useWarehouse();
@@ -173,7 +174,7 @@ export default function Debts() {
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-600">
                     <div className="flex items-center gap-1.5">
                       <Phone className="w-4 h-4" />
-                      <span>{debt.phone}</span>
+                      <span>{formatPhoneDisplay(debt.phone)}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />

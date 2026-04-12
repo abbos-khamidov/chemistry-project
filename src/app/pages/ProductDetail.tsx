@@ -26,7 +26,7 @@ import { productName } from '../lib/productLocale';
 import { formatDateDotDMY } from '../lib/warehouseUtils';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
-import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 const MAX_IMAGE_BYTES = 600 * 1024;
 
 
@@ -569,7 +569,7 @@ export default function ProductDetail() {
             </div>
             <div>
               <dt className="text-slate-500">{t("debts.phone")}</dt>
-              <dd className="font-medium text-slate-900">{r.phone}</dd>
+              <dd className="font-medium text-slate-900">{formatPhoneDisplay(r.phone)}</dd>
             </div>
             <div>
               <dt className="text-slate-500">{t("debtDetail.company")}</dt>
@@ -813,7 +813,7 @@ export default function ProductDetail() {
                   <option value="">{t('products.debtorSelectPlaceholder')}</option>
                   {debts.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.fullName} · {d.phone}
+                      {d.fullName} · {formatPhoneDisplay(d.phone)}
                       {d.company ? ` · ${d.company}` : ''}
                     </option>
                   ))}

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
-import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import { useParams, Link } from 'react-router';
 import { toast } from 'sonner';
 import {
@@ -292,7 +292,7 @@ export default function DebtDetail() {
               <h1 className="text-2xl font-bold text-slate-900">{debt.fullName}</h1>
               <div className="flex items-center gap-2 mt-2">
                 <Phone className="w-4 h-4 text-slate-600" />
-                <span className="text-slate-600">{debt.phone}</span>
+                <span className="text-slate-600">{formatPhoneDisplay(debt.phone)}</span>
               </div>
               {debt.company && (
                 <div className="flex items-center gap-2 mt-1 text-slate-600">
@@ -354,7 +354,7 @@ export default function DebtDetail() {
               <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-2">
                 <p className="text-sm font-medium text-slate-800">{t('debtDetail.payDebtorTitle')}</p>
                 <p className="text-base font-semibold text-slate-900">{debt.fullName}</p>
-                <p className="text-sm text-slate-600">{debt.phone}</p>
+                <p className="text-sm text-slate-600">{formatPhoneDisplay(debt.phone)}</p>
                 {debt.company ? <p className="text-sm text-slate-600">{debt.company}</p> : null}
                 <p className="text-xs text-slate-500 pt-1">{t('debtDetail.payDebtorHint')}</p>
               </div>

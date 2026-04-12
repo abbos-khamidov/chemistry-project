@@ -5,6 +5,7 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
 import { formatDateDotDMY } from '../lib/warehouseUtils';
+import { formatPhoneDisplay } from '../lib/phone';
 
 export default function Clients() {
   const { clientSales, products } = useWarehouse();
@@ -73,7 +74,7 @@ export default function Clients() {
                         <UserCircle className="w-4 h-4 text-slate-400 shrink-0" />
                         <div>
                           <p className="font-medium text-slate-900">{r.fullName}</p>
-                          <p className="text-xs text-slate-500">{r.phone}</p>
+                          <p className="text-xs text-slate-500">{formatPhoneDisplay(r.phone)}</p>
                         </div>
                       </div>
                     </td>

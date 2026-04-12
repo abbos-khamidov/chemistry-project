@@ -7,7 +7,7 @@ import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { canManageStaff } from '../lib/permissions';
 import { PhoneField } from '../components/PhoneField';
-import { formatInternationalPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
+import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
@@ -618,7 +618,7 @@ export default function Workers() {
                     <p className="font-medium text-slate-900">{w.fullName}</p>
                     <p className="text-sm text-slate-600">@{w.username}</p>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-xs text-slate-500">{formatInternationalPhoneDisplay(w.phone)}</p>
+                      <p className="text-xs text-slate-500">{formatPhoneDisplay(w.phone)}</p>
                       {!isCompleteInternationalPhone12(normalizePhoneForStore(w.phone)) && (
                         <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title={t('common.phoneInvalid12')}>
                           <AlertCircle className="w-3 h-3 shrink-0" />

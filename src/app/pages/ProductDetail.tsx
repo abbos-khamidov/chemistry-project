@@ -39,6 +39,8 @@ export default function ProductDetail() {
   const isDirector = user?.role === 'director';
   const canEdit = canEditProducts(user);
   const canDebt = canIssueDebt(user);
+  /** Приход на склад — то же право, что и редактирование карточки товара. */
+  const canInbound = canEditProducts(user);
 
   const product = products.find((p) => p.id === id);
   const [inQty, setInQty] = useState('');
@@ -137,20 +139,20 @@ export default function ProductDetail() {
 
   const handleInbound = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isDirector) return;
+    if (!canInbound) return;
     const q = Number(inQty);
     if (!Number.isFinite(q) || q <= 0) {
       toast.error(t('products.toastQty'));
       return;
     }
-    const ok = addProductInbound(product.id, q, user?.fullName ?? 'Директор');
+    const ok = addProductInbound(product.id, q, user?.fullName ?? '—');
     if (!ok) {
       toast.error(t('products.toastInboundFail'));
       return;
     }
     appendAudit({
-      userName: user?.fullName ?? 'Директор',
-      userRole: 'director',
+      userName: user?.fullName ?? '—',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'worker',
       action: 'Изменение',
       entity: 'Товар',
       details: `${product.name}: приход +${q}`,
@@ -611,7 +613,7 @@ export default function ProductDetail() {
       </div>
 
 
-      {isDirector && (
+      {canInbound ? (
         <div className="bg-white rounded-xl border border-slate-200/80 p-6 mb-6">
           <h2 className="font-semibold text-slate-900 mb-4">{t("products.inboundTitle")}</h2>
           <p className="text-sm text-slate-600 mb-4">
@@ -634,6 +636,11 @@ export default function ProductDetail() {
               {t("products.inboundSubmit")}
             </button>
           </form>
+        </div>
+      ) : (
+        <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-6 mb-6">
+          <h2 className="font-semibold text-slate-900 mb-2">{t("products.inboundTitle")}</h2>
+          <p className="text-sm text-slate-600">{t("products.inboundDeniedHint")}</p>
         </div>
       )}
 

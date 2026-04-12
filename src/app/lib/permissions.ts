@@ -85,3 +85,11 @@ export function canViewDebts(user: User | null): boolean {
 export function canEditDebtRecords(user: User | null): boolean {
   return getPermissions(user).editDebtRecords;
 }
+
+/** Стартовая страница после входа — как в `RoleHomeRedirect`. */
+export function getHomePath(user: User | null): string {
+  if (!user) return '/login';
+  if (user.role === 'director') return '/analytics';
+  if (user.role === 'assistant' && canViewAnalytics(user)) return '/analytics';
+  return '/products';
+}

@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router';
 import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { canManageStaff, canViewAnalytics, canViewDebts } from '../lib/permissions';
+import { canManageStaff, canViewAnalytics, canViewDebts, getHomePath } from '../lib/permissions';
 
 /** Только директор: аналитика, аудит. */
 export function DirectorOnly({ children }: { children: ReactNode }) {
@@ -30,9 +30,7 @@ export function DirectorOrWorker({ children }: { children: ReactNode }) {
 export function RoleHomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'director') return <Navigate to="/analytics" replace />;
-  if (user.role === 'assistant' && canViewAnalytics(user)) return <Navigate to="/analytics" replace />;
-  return <Navigate to="/products" replace />;
+  return <Navigate to={getHomePath(user)} replace />;
 }
 
 

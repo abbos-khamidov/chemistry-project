@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
-import { dateInRange } from '../lib/warehouseUtils';
+import { dateInRange, formatDateDotDMY } from '../lib/warehouseUtils';
 
 /** Короткие подписи на оси Y для крупных сумм (UZS), без обрезания в контейнере. */
 function compactAxisUzs(n: number): string {
@@ -109,7 +109,7 @@ export default function Analytics() {
           }
         }
         return {
-          month: format(m, 'yyyy-MM-dd'),
+          month: format(m, 'dd.MM.yyyy'),
           value: valueDelta,
           operations,
         };
@@ -142,7 +142,7 @@ export default function Analytics() {
             unpaid += d.remainingAmount;
           }
         }
-        return { month: format(m, 'yyyy-MM-dd'), paid, unpaid };
+        return { month: format(m, 'dd.MM.yyyy'), paid, unpaid };
       });
     } catch {
       return [];
@@ -245,7 +245,7 @@ export default function Analytics() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-900">{t('analytics.chartInventory')}</h3>
             <span className="text-xs text-slate-600">
-              {startDate} — {endDate}
+              {formatDateDotDMY(startDate)} — {formatDateDotDMY(endDate)}
             </span>
           </div>
           {monthlyInventoryData.length === 0 ? (

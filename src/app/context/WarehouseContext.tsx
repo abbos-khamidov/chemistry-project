@@ -48,8 +48,17 @@ function uid() {
 }
 
 function nowStamp() {
-  const d = new Date();
-  return d.toISOString().slice(0, 16).replace('T', ' ');
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
 }
 
 function debtStatusAfterPayment(remaining: number, paid: number, dueDate: string): Debt['status'] {

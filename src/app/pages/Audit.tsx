@@ -8,7 +8,7 @@ export default function Audit() {
   const { auditLog } = useWarehouse();
   const { t } = useI18n();
   const [q, setQ] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'director' | 'worker'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'director' | 'assistant' | 'worker'>('all');
 
   const rows = useMemo(() => {
     return auditLog.filter((e) => {
@@ -46,11 +46,12 @@ export default function Audit() {
           <Filter className="w-5 h-5 text-slate-500" />
           <select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as 'all' | 'director' | 'worker')}
+            onChange={(e) => setRoleFilter(e.target.value as 'all' | 'director' | 'assistant' | 'worker')}
             className="px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
           >
             <option value="all">{t("audit.filterAll")}</option>
             <option value="director">{t("audit.filterDirector")}</option>
+            <option value="assistant">{t("audit.filterAssistant")}</option>
             <option value="worker">{t("audit.filterWorker")}</option>
           </select>
         </div>
@@ -67,7 +68,6 @@ export default function Audit() {
                 <th className="text-left py-3 px-4 font-medium text-slate-600">{t("audit.colAction")}</th>
                 <th className="text-left py-3 px-4 font-medium text-slate-600">{t("audit.colEntity")}</th>
                 <th className="text-left py-3 px-4 font-medium text-slate-600">{t("audit.colDetails")}</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-600">{t("audit.colIp")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -80,10 +80,16 @@ export default function Audit() {
                       className={
                         r.userRole === 'director'
                           ? 'text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full'
-                          : 'text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full'
+                          : r.userRole === 'assistant'
+                            ? 'text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full'
+                            : 'text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full'
                       }
                     >
-                      {r.userRole === "director" ? t("common.roleDirectorShort") : t("common.roleWorkerShort")}
+                      {r.userRole === "director"
+                        ? t("common.roleDirectorShort")
+                        : r.userRole === "assistant"
+                          ? t("common.roleAssistantShort")
+                          : t("common.roleWorkerShort")}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-slate-700">{r.action}</td>
@@ -91,7 +97,6 @@ export default function Audit() {
                   <td className="py-3 px-4 text-slate-600 max-w-xs truncate" title={r.details}>
                     {r.details}
                   </td>
-                  <td className="py-3 px-4 text-slate-500 font-mono text-xs">{r.ip}</td>
                 </tr>
               ))}
             </tbody>

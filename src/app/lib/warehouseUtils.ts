@@ -23,10 +23,33 @@ export function formatDateDotDMY(raw: string): string {
   return raw;
 }
 
-/** Журнал аудита: «YYYY-MM-DD HH:MM» → «DD.MM.YYYY HH:MM» (время сохраняется). */
+/** Журнал аудита: отображение в часовом поясе Ташкента (Asia/Tashkent). */
 export function formatAuditAtDisplay(raw: string): string {
   if (!raw || typeof raw !== 'string') return '';
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](.+))?$/.exec(raw.trim());
+  const s = raw.trim();
+
+  // Если в строке есть timezone/ISO, конвертируем момент во время Ташкента.
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(s);
+  if (hasZone || s.includes('T')) {
+    const normalized = s.includes(' ') ? s.replace(' ', 'T') : s;
+    const dt = new Date(normalized);
+    if (Number.isFinite(dt.getTime())) {
+      const parts = new Intl.DateTimeFormat('ru-RU', {
+        timeZone: 'Asia/Tashkent',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(dt);
+      const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+      return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}`.trim();
+    }
+  }
+
+  // legacy-формат без timezone: просто приводим к DD.MM.YYYY HH:MM
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](.+))?$/.exec(s);
   if (!m) return formatDateDotDMY(raw);
   const dmy = `${m[3]}.${m[2]}.${m[1]}`;
   const rest = m[4]?.trim();

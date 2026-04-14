@@ -133,6 +133,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       debtStatusPartial: 'Частично',
       debtStatusOverdue: 'Просрочен',
       roleDirectorShort: 'Директор',
+      roleAssistantShort: 'Ассистент',
       roleWorkerShort: 'Рабочий',
     },
     notifications: {
@@ -151,6 +152,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       searchPlaceholder: 'Поиск по пользователю, действию, сущности...',
       filterAll: 'Все роли',
       filterDirector: 'Директор',
+      filterAssistant: 'Ассистент',
       filterWorker: 'Рабочий',
       colTime: 'Время',
       colUser: 'Пользователь',
@@ -534,6 +536,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       debtStatusPartial: 'Qisman',
       debtStatusOverdue: "Muddati o'tgan",
       roleDirectorShort: 'Direktor',
+      roleAssistantShort: 'Assistent',
       roleWorkerShort: 'Ishchi',
     },
     notifications: {
@@ -552,6 +555,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
       searchPlaceholder: 'Foydalanuvchi, harakat, obyekt bo‘yicha qidiruv...',
       filterAll: 'Barcha rollar',
       filterDirector: 'Direktor',
+      filterAssistant: 'Assistent',
       filterWorker: 'Ishchi',
       colTime: 'Vaqt',
       colUser: 'Foydalanuvchi',

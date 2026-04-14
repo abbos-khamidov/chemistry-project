@@ -80,8 +80,10 @@ export function parseExpirationDateYmd(raw: string | undefined | null): string |
   const s = raw.trim().slice(0, 10);
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const dotted = /^(\d{4})\.(\d{2})\.(\d{2})$/.exec(s);
-  if (dotted) return `${dotted[1]}-${dotted[2]}-${dotted[3]}`;
+  const ymdDotted = /^(\d{4})\.(\d{2})\.(\d{2})$/.exec(s);
+  if (ymdDotted) return `${ymdDotted[1]}-${ymdDotted[2]}-${ymdDotted[3]}`;
+  const dmyDotted = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s);
+  if (dmyDotted) return `${dmyDotted[3]}-${dmyDotted[2]}-${dmyDotted[1]}`;
   return null;
 }
 

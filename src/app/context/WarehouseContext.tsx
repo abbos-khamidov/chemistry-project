@@ -129,7 +129,7 @@ type ProductRow = {
 type DebtRow = {
   id: string;
   full_name: string;
-  phone: string;
+  phone?: string;
   company: string | null;
   created_at?: string | null;
   created_by_role: Debt['createdByRole'] | null;
@@ -890,8 +890,8 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       if (!Number.isInteger(qty) || qty <= 0) {
         return { ok: false, error: 'Количество должно быть целым числом больше 0' };
       }
-      const salePhoneNorm = normalizePhoneForStore(input.phone);
-      if (!isCompleteInternationalPhone12(salePhoneNorm)) {
+      const salePhoneNorm = normalizePhoneForStore(input.phone ?? '');
+      if (salePhoneNorm && !isCompleteInternationalPhone12(salePhoneNorm)) {
         return {
           ok: false,
           error: 'Номер: знак + и ровно 12 цифр (без букв). Страна определяется автоматически.',

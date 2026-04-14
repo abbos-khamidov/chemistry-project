@@ -1,18 +1,15 @@
-import logoUrl from '../../assets/logo.png?url';
-
 type Props = {
   className?: string;
 };
 
-/** Логотип: файл `src/assets/logo.png` (Vite кладёт в `dist/assets/`). */
+/** Текстовый логотип бренда. */
 export function BrandLogo({ className = '' }: Props) {
   return (
-    <img
-      src={logoUrl}
-      alt="Rosita"
-      className={`object-contain object-left ${className}`}
-      width={160}
-      height={48}
-    />
+    <span
+      className={`inline-flex items-center font-extrabold tracking-[0.08em] text-slate-900 dark:text-slate-100 ${className}`}
+      aria-label="AGRO-NOMIA"
+    >
+      AGRO-NOMIA
+    </span>
   );
 }

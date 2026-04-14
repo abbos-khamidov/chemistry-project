@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import {
@@ -359,7 +359,7 @@ export default function ProductDetail() {
       return;
     }
     const sp = normalizePhoneForStore(sPhone);
-    if (!isCompleteInternationalPhone12(sp)) {
+    if (sp && !isCompleteInternationalPhone12(sp)) {
       toast.error(t('common.phoneInvalid12'));
       return;
     }
@@ -368,7 +368,7 @@ export default function ProductDetail() {
       productId: product.id,
       quantity: qty,
       fullName: sName.trim(),
-      phone: sp,
+      phone: sp || undefined,
       company: sCompany.trim() || undefined,
       createdByUserId: user?.id,
       createdByRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'worker',
@@ -393,6 +393,19 @@ export default function ProductDetail() {
     setSCompany('');
     setSQty('1');
   };
+
+  const debtorsForSelect = useMemo(() => {
+    const sorted = [...debts].sort(compareDebtsNewestFirst);
+    const seen = new Set<string>();
+    const unique: typeof debts = [];
+    for (const d of sorted) {
+      const key = `${d.fullName.trim().toLowerCase()}|${normalizePhoneForStore(d.phone)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(d);
+    }
+    return unique;
+  }, [debts]);
 
   const r = product.shipmentRecipient;
 
@@ -522,7 +535,6 @@ export default function ProductDetail() {
                     label={t("products.colPrice")}
                     value={ePrice}
                     onChange={setEPrice}
-                    required
                     inputClassName="w-full border rounded-lg px-3 py-2"
                   />
                 </div>
@@ -811,7 +823,7 @@ export default function ProductDetail() {
                   className="w-full border border-slate-300 rounded-lg px-3 py-2"
                 >
                   <option value="">{t('products.debtorSelectPlaceholder')}</option>
-                  {[...debts].sort(compareDebtsNewestFirst).map((d) => (
+                  {debtorsForSelect.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.fullName} · {formatPhoneDisplay(d.phone)}
                       {d.company ? ` · ${d.company}` : ''}

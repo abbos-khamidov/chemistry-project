@@ -3,7 +3,7 @@ import type { AppLocale } from './types';
 export const messages: Record<AppLocale, Record<string, unknown>> = {
   ru: {
     layout: {
-      title: 'Rosita',
+      title: 'AGRO-NOMIA',
       brandTagline: 'Мы поможем вам с высококачественным урожаем',
       searchDirector: 'Поиск по отчётам и метрикам...',
       searchWorker: 'Поиск по товарам на складе...',
@@ -404,7 +404,7 @@ export const messages: Record<AppLocale, Record<string, unknown>> = {
   },
   uz: {
     layout: {
-      title: 'Rosita',
+      title: 'AGRO-NOMIA',
       brandTagline: 'Yuqori sifatli hosil uchun sizga yordam beramiz',
       searchDirector: "Hisobotlar va metrikalar bo'yicha qidiruv...",
       searchWorker: "Ombordagi tovarlar bo'yicha qidiruv...",

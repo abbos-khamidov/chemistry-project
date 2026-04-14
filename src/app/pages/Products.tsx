@@ -8,7 +8,7 @@ import { canAddProducts } from '../lib/permissions';
 import { useI18n } from "../i18n/I18nContext";
 import { productName } from "../lib/productLocale";
 import { AmountField } from "../components/AmountField";
-import { formatDateDotDMY } from "../lib/warehouseUtils";
+import { daysLeftUntilExpiration, formatDateDotDMY } from "../lib/warehouseUtils";
 
 const MAX_IMAGE_BYTES = 600 * 1024;
 
@@ -398,7 +398,20 @@ export default function Products() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">{t("products.labelExp")}:</span>
-                  <span className="font-medium text-slate-900">{formatDateDotDMY(product.expirationDate)}</span>
+                  <span className="font-medium text-slate-900 text-right">
+                    {formatDateDotDMY(product.expirationDate)}
+                    {(() => {
+                      const days = daysLeftUntilExpiration(product.expirationDate);
+                      if (days === null) return null;
+                      return (
+                        <span className="block text-xs text-slate-500">
+                          {days >= 0
+                            ? t('products.expiryDaysLeft').replace('{days}', String(days))
+                            : t('products.expiryExpired')}
+                        </span>
+                      );
+                    })()}
+                  </span>
                 </div>
               </div>
 
@@ -448,7 +461,20 @@ export default function Products() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-900">{product.price.toLocaleString()} UZS</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{product.supplier}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{formatDateDotDMY(product.expirationDate)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                      <span>{formatDateDotDMY(product.expirationDate)}</span>
+                      {(() => {
+                        const days = daysLeftUntilExpiration(product.expirationDate);
+                        if (days === null) return null;
+                        return (
+                          <span className="block text-xs text-slate-500">
+                            {days >= 0
+                              ? t('products.expiryDaysLeft').replace('{days}', String(days))
+                              : t('products.expiryExpired')}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusColor(product.status)}`}>
                         {getStatusLabel(product.status)}

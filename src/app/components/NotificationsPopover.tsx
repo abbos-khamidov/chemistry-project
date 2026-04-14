@@ -9,12 +9,12 @@ import { canAddProducts, canEditProducts } from '../lib/permissions';
 import {
   formatAuditAtDisplay,
   formatDateDotDMY,
-  getProductsExpiringWithinDays,
+  daysLeftUntilExpiration,
   parseExpirationDateYmd,
 } from '../lib/warehouseUtils';
 
 const MAX_ITEMS = 50;
-const EXPIRY_WINDOW_DAYS = 30;
+const EXPIRY_MILESTONES = [30, 7, 3] as const;
 const MAX_EXPIRY_ITEMS = 30;
 const EXPIRY_READ_STORAGE = 'warehouse-expiry-read-v1';
 
@@ -37,8 +37,8 @@ function saveExpiryReadSet(next: Set<string>) {
   }
 }
 
-function expiryDismissKey(productId: string, expirationYmd: string) {
-  return `${productId}|${expirationYmd}`;
+function expiryDismissKey(productId: string, expirationYmd: string, daysLeft: number) {
+  return `${productId}|${expirationYmd}|${daysLeft}`;
 }
 
 export function NotificationsPopover() {
@@ -56,25 +56,46 @@ export function NotificationsPopover() {
     return loadExpiryReadSet();
   }, [expiryReadBump]);
 
-  const expiring = useMemo(() => {
-    if (!showExpiryAlerts) return [];
-    return getProductsExpiringWithinDays(products, EXPIRY_WINDOW_DAYS);
-  }, [products, showExpiryAlerts]);
-
   const expiryRows = useMemo(() => {
-    return expiring.map(({ product, daysLeft }) => {
+    if (!showExpiryAlerts) return [] as Array<{
+      kind: 'expiry';
+      product: (typeof products)[number];
+      daysLeft: number;
+      ymd: string;
+      key: string;
+      read: boolean;
+    }>;
+
+    const out: Array<{
+      kind: 'expiry';
+      product: (typeof products)[number];
+      daysLeft: number;
+      ymd: string;
+      key: string;
+      read: boolean;
+    }> = [];
+
+    for (const product of products) {
+      if (!product.quantity || product.quantity <= 0) continue;
+      const daysLeft = daysLeftUntilExpiration(product.expirationDate);
+      if (daysLeft === null) continue;
+      if (!EXPIRY_MILESTONES.includes(daysLeft as (typeof EXPIRY_MILESTONES)[number])) continue;
+
       const ymd = parseExpirationDateYmd(product.expirationDate) ?? '';
-      const key = expiryDismissKey(product.id, ymd);
-      return {
-        kind: 'expiry' as const,
+      const key = expiryDismissKey(product.id, ymd, daysLeft);
+      out.push({
+        kind: 'expiry',
         product,
         daysLeft,
         ymd,
         key,
         read: expiryReadSet.has(key),
-      };
-    });
-  }, [expiring, expiryReadSet]);
+      });
+    }
+
+    out.sort((a, b) => a.daysLeft - b.daysLeft);
+    return out;
+  }, [products, showExpiryAlerts, expiryReadSet]);
 
   const expiryShown = expiryRows.slice(0, MAX_EXPIRY_ITEMS);
   const auditSlots = Math.max(0, MAX_ITEMS - expiryShown.length);
@@ -159,7 +180,7 @@ export function NotificationsPopover() {
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{t('notifications.title')}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('notifications.subtitle')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('notifications.subtitle').replace('{days}', EXPIRY_MILESTONES.join('/'))}</p>
               </div>
               {unreadCount > 0 && (
                 <button

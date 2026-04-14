@@ -23,7 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { canEditProducts, canIssueDebt } from '../lib/permissions';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
-import { compareDebtsNewestFirst, formatDateDotDMY } from '../lib/warehouseUtils';
+import { compareDebtsNewestFirst, daysLeftUntilExpiration, formatDateDotDMY } from '../lib/warehouseUtils';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
 import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
@@ -773,6 +773,17 @@ export default function ProductDetail() {
               <div>
                 <p className="text-sm text-slate-600">{t("products.goodUntil")}</p>
                 <p className="text-sm font-medium text-slate-900">{formatDateDotDMY(product.expirationDate)}</p>
+                {(() => {
+                  const days = daysLeftUntilExpiration(product.expirationDate);
+                  if (days === null) return null;
+                  return (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {days >= 0
+                        ? t('products.expiryDaysLeft').replace('{days}', String(days))
+                        : t('products.expiryExpired')}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </div>

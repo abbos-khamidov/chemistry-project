@@ -37,8 +37,6 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="flex flex-col items-center gap-3">
             <BrandLogo className="h-16 w-auto max-w-[220px] mx-auto object-center" />
-            <h1 className="text-2xl font-semibold text-slate-800">{t('layout.title')}</h1>
-            <p className="text-slate-600 text-sm max-w-md leading-relaxed">{t('layout.brandTagline')}</p>
           </div>
         </div>
 

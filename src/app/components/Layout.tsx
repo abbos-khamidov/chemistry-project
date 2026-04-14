@@ -170,12 +170,8 @@ export default function Layout() {
       >
         <div className="flex flex-col h-full">
           <div className="min-h-16 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 border-b border-slate-200/80">
-            <Link to="/" className="flex items-center gap-3 min-w-0 flex-1">
+            <Link to="/" className="flex items-center min-w-0 flex-1">
               <BrandLogo className="h-9 w-auto max-w-[112px] shrink-0" />
-              <div className="min-w-0">
-                <p className="font-semibold text-sm text-slate-800 leading-tight">{t('layout.title')}</p>
-                <p className="text-[10px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{t('layout.brandTagline')}</p>
-              </div>
             </Link>
             <button type="button" onClick={() => setSidebarOpen(false)} className="lg:hidden shrink-0">
               <X className="w-5 h-5" />

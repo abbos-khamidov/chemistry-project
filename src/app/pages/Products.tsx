@@ -413,7 +413,15 @@ export default function Products() {
                     })()}
                   </span>
                 </div>
-              </div>
+              {(() => {
+                const days = daysLeftUntilExpiration(product.expirationDate);
+                if (days === null || days < 0 || days > 30) return null;
+                return (
+                  <div className="mb-2 text-xs font-semibold text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                    {t('products.expirySoonBanner')}
+                  </div>
+                );
+              })()}
 
               {product.status === "low-stock" && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">

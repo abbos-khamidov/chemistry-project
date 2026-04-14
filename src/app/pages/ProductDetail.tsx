@@ -708,7 +708,26 @@ export default function ProductDetail() {
             </div>
             <div>
               <label className="text-sm text-slate-600 block mb-1">{t("products.labelExp")}</label>
-              <p className="font-medium text-slate-900">{product.expirationDate}</p>
+              <p className="font-medium text-slate-900">{formatDateDotDMY(product.expirationDate)}</p>
+              {(() => {
+                const days = daysLeftUntilExpiration(product.expirationDate);
+                if (days === null) return null;
+                if (days >= 0 && days <= 30) {
+                  return (
+                    <>
+                      <p className="text-xs text-slate-500 mt-0.5">{t('products.expiryDaysLeft').replace('{days}', String(days))}</p>
+                      <p className="text-xs font-semibold text-red-600 mt-0.5">{t('products.expirySoonBanner')}</p>
+                    </>
+                  );
+                }
+                return (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {days >= 0
+                      ? t('products.expiryDaysLeft').replace('{days}', String(days))
+                      : t('products.expiryExpired')}
+                  </p>
+                );
+              })()}
             </div>
             <div className="sm:col-span-2">
               <label className="text-sm text-slate-600 block mb-1">{t("common.status")}</label>

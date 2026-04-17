@@ -413,6 +413,7 @@ export default function Products() {
                     })()}
                   </span>
                 </div>
+              </div>
               {(() => {
                 const days = daysLeftUntilExpiration(product.expirationDate);
                 if (days === null || days < 0 || days > 30) return null;

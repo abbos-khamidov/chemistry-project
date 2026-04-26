@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 import { 
   Package, 
   AlertCircle, 
-  DollarSign, 
+  Banknote, 
   Activity, 
   FileText, 
   Clock,
@@ -60,7 +60,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-emerald-600" />
+              <Banknote className="w-6 h-6 text-emerald-600" />
             </div>
             <TrendingUp className="w-5 h-5 text-emerald-600" />
           </div>

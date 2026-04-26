@@ -8,7 +8,7 @@ import {
   Trash2,
   AlertCircle,
   Calendar,
-  DollarSign,
+  Banknote,
   Building,
   X,
   Truck,
@@ -760,7 +760,7 @@ export default function ProductDetail() {
           <div className="bg-white rounded-xl border border-slate-200/80 p-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-600" />
+                <Banknote className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
                 <p className="text-sm text-slate-600">{t("products.valueCard")}</p>

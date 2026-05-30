@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { toast } from 'sonner';
 import {
   Search,
   Filter,
@@ -9,7 +10,9 @@ import {
   Banknote,
   ChevronRight,
   AlertCircle,
+  FileDown,
 } from 'lucide-react';
+import { exportDebtsToXlsx } from '../lib/exportXlsx';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
@@ -75,17 +78,34 @@ export default function Debts() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
       <div className="mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('debts.pageTitle')}</h1>
-          <p className="text-slate-600 mt-1">
-            {t('debts.records')}: {filteredDebts.length}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{t('debts.pageTitle')}</h1>
+            <p className="text-slate-600 mt-1">
+              {t('debts.records')}: {filteredDebts.length}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                exportDebtsToXlsx(filteredDebts);
+                toast.success('Файл готов', { description: 'debts.xlsx скачан' });
+              } catch {
+                toast.error('Не удалось сформировать файл');
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 self-start whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            Выгрузить в Excel
+          </button>
+        </div>
           {!isDirector && (
             <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3 max-w-2xl">
               {t('debts.workerHint')}
             </p>
           )}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

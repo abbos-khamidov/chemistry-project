@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Search, UserCircle, Package } from 'lucide-react';
+import { toast } from 'sonner';
+import { Search, UserCircle, Package, FileDown } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useI18n } from '../i18n/I18nContext';
 import { productName } from '../lib/productLocale';
 import { compareClientSalesNewestFirst, formatDateDotDMY } from '../lib/warehouseUtils';
 import { formatPhoneDisplay } from '../lib/phone';
+import { exportClientsToXlsx } from '../lib/exportXlsx';
 
 export default function Clients() {
   const { clientSales, products } = useWarehouse();
@@ -31,9 +33,26 @@ export default function Clients() {
           <h1 className="text-2xl font-bold text-slate-900">{t('clients.pageTitle')}</h1>
           <p className="text-slate-600 mt-1">{t('clients.pageSubtitle')}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 text-right">
-          <p className="text-xs text-slate-500">{t('clients.totalPeriod')}</p>
-          <p className="text-lg font-semibold text-slate-900">{total.toLocaleString()} UZS</p>
+        <div className="flex items-center gap-3">
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 text-right">
+            <p className="text-xs text-slate-500">{t('clients.totalPeriod')}</p>
+            <p className="text-lg font-semibold text-slate-900">{total.toLocaleString()} UZS</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                exportClientsToXlsx(rows);
+                toast.success('Файл готов', { description: 'clients.xlsx скачан' });
+              } catch {
+                toast.error('Не удалось сформировать файл');
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            Выгрузить в Excel
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { format, eachMonthOfInterval, parseISO } from 'date-fns';
-import { Calendar, TrendingUp, TrendingDown, Banknote, Package, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { Calendar, TrendingUp, TrendingDown, Banknote, Package, FileText, FileDown } from 'lucide-react';
+import { exportAnalyticsToXlsx } from '../lib/exportAnalyticsXlsx';
 import {
   LineChart,
   Line,
@@ -186,6 +188,21 @@ export default function Analytics() {
                 className="px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
               />
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  exportAnalyticsToXlsx({ t, startDate, endDate, stats, monthlyInventoryData, debtAnalytics, topProducts, totalWarehouseValue });
+                  toast.success(t('analytics.exportToastTitle'), { description: t('analytics.exportToastDesc') });
+                } catch {
+                  toast.error(t('analytics.exportError'));
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50"
+            >
+              <FileDown className="w-4 h-4" />
+              {t('analytics.export')}
+            </button>
           </div>
         </div>
       </div>

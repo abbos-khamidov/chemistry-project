@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { UserPlus, Copy, Users, UserX, Trash2, UserCheck, KeyRound, AlertCircle } from 'lucide-react';
+import { UserPlus, Copy, Users, UserX, Trash2, UserCheck, KeyRound, AlertCircle, FileDown } from 'lucide-react';
+import { exportWorkersToXlsx } from '../lib/exportXlsx';
 import type { User } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useWarehouse } from '../context/WarehouseContext';
@@ -604,9 +605,26 @@ export default function Workers() {
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-slate-600" />
-            <h2 className="font-semibold text-slate-900">{t("workers.allWorkers")}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-slate-600" />
+              <h2 className="font-semibold text-slate-900">{t("workers.allWorkers")}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  exportWorkersToXlsx(sortedWorkers);
+                  toast.success('Файл готов', { description: 'workers.xlsx скачан' });
+                } catch {
+                  toast.error('Не удалось сформировать файл');
+                }
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
+            </button>
           </div>
           {sortedWorkers.length === 0 ? (
             <p className="text-slate-600 text-sm">{t("workers.empty")}</p>

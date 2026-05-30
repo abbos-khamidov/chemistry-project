@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { Plus, Search, Filter, Grid, List, AlertCircle, Package, ChevronRight, X, ImageIcon } from "lucide-react";
+import { Plus, Search, Filter, Grid, List, AlertCircle, Package, ChevronRight, X, ImageIcon, FileDown } from "lucide-react";
+import { exportProductsToXlsx } from "../lib/exportXlsx";
 import { useWarehouse } from "../context/WarehouseContext";
 import { useAuth } from "../context/AuthContext";
 import { canAddProducts } from '../lib/permissions';
@@ -347,6 +348,21 @@ export default function Products() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  exportProductsToXlsx(filteredProducts);
+                  toast.success('Файл готов', { description: 'products.xlsx скачан' });
+                } catch {
+                  toast.error('Не удалось сформировать файл');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
+            </button>
             <button
               type="button"
               onClick={() => setViewMode("grid")}

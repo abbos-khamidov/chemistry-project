@@ -21,6 +21,11 @@ function safeSheetName(name: string): string {
   return name.replace(/[:\\/?*[\]]/g, '-').slice(0, 31) || 'Sheet';
 }
 
+function toDMY(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+}
+
 /** Скачивает книгу Excel с данными аналитики за выбранный период. */
 export function exportAnalyticsToXlsx(input: AnalyticsExportInput): void {
   const { t, startDate, endDate, stats } = input;
@@ -29,7 +34,7 @@ export function exportAnalyticsToXlsx(input: AnalyticsExportInput): void {
 
   const summaryRows: (string | number)[][] = [
     [t('analytics.pageTitle')],
-    [`${t('analytics.periodStart')}: ${startDate}`, `${t('analytics.periodEnd')}: ${endDate}`],
+    [`${t('analytics.periodStart')}: ${toDMY(startDate)}`, `${t('analytics.periodEnd')}: ${toDMY(endDate)}`],
     [],
     [t('analytics.cardWarehouseValue'), stats.totalWarehouseValue],
     [t('analytics.cardCollected'), stats.collectedInRange],

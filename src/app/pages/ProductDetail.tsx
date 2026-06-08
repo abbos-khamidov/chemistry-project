@@ -174,7 +174,7 @@ export default function ProductDetail() {
     const patch: UpdateProductInput = {
       name: eName.trim(),
       quantity: q,
-      unit: 'шт',
+      unit: product.unit,
       price: pr,
       supplier: eSupplier.trim() || '—',
       expirationDate: eExp || product.expirationDate,

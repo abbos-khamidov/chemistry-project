@@ -120,20 +120,26 @@ function readInitialSessionUserId(): string | null {
   return id;
 }
 
+/** Последний успешно загруженный список — подстраховка от затирания реальных данных при сетевых сбоях. */
+let lastKnownAccounts: StoredAccount[] | null = null;
+
 async function fetchAccountsFromDb(): Promise<StoredAccount[]> {
   if (!isSupabaseConfigured) return seedAccounts();
   const { data, error } = await supabase.from('accounts').select('*').order('created_at', { ascending: true });
   if (error || !data) {
     console.error('[AuthContext] Failed to load accounts from Supabase:', error);
-    return seedAccounts();
+    return lastKnownAccounts ?? seedAccounts();
   }
   const rows = data as AccountRow[];
   if (rows.length === 0) {
     const seeded = seedAccounts();
     await upsertAccountsToDb(seeded);
+    lastKnownAccounts = seeded;
     return seeded;
   }
-  return rows.map(rowToStored);
+  const result = rows.map(rowToStored);
+  lastKnownAccounts = result;
+  return result;
 }
 
 async function upsertAccountsToDb(accounts: StoredAccount[]): Promise<void> {

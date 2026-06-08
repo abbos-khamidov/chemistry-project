@@ -27,6 +27,7 @@ export default function Products() {
 
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [unitType, setUnitType] = useState<"kg" | "liter" | "">("");
   const [price, setPrice] = useState("");
   const [supplier, setSupplier] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
@@ -79,6 +80,7 @@ export default function Products() {
   const resetForm = () => {
     setName("");
     setQuantity("");
+    setUnitType("");
     setPrice("");
     setSupplier("");
     setNotes("");
@@ -115,13 +117,14 @@ export default function Products() {
       return;
     }
 
+    const unit = unitType === "kg" ? "кг" : unitType === "liter" ? "л" : "шт";
     addProduct({
       name: name.trim(),
       imageUrl: workerPhotoDataUrl || undefined,
       category: "Без категории",
       categoryUz: undefined,
       quantity: q,
-      unit: "шт",
+      unit,
       price: pr,
       supplier: supplier.trim() || "—",
       expirationDate: expirationDate || new Date().toISOString().slice(0, 10),
@@ -250,9 +253,30 @@ export default function Products() {
                       className="w-full border border-slate-300 rounded-lg px-3 py-2"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm text-slate-700 mb-1">{t("products.labelUnitType")}</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setUnitType("kg")}
+                        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${unitType === "kg" ? "bg-slate-700 text-white border-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}
+                      >
+                        {t("products.unitKg")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUnitType("liter")}
+                        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${unitType === "liter" ? "bg-slate-700 text-white border-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}
+                      >
+                        {t("products.unitLiter")}
+                      </button>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm text-slate-700 mb-1">{t("products.labelQty")}</label>
+                      <label className="block text-sm text-slate-700 mb-1">
+                        {t("products.labelQty")}{unitType === "kg" ? " (кг)" : unitType === "liter" ? " (л)" : ""}
+                      </label>
                       <input
                         required
                         type="number"
@@ -401,7 +425,7 @@ export default function Products() {
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">{t("common.qty")}:</span>
                   <span className="font-medium text-slate-900">
-                    {product.quantity}
+                    {product.quantity} {product.unit && product.unit !== "шт" ? product.unit : ""}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -482,7 +506,7 @@ export default function Products() {
                       <p className="font-medium text-slate-900">{productName(product, locale)}</p>
                     </td>
                                         <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      {product.quantity}
+                      {product.quantity}{product.unit && product.unit !== "шт" ? ` ${product.unit}` : ""}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-900">{product.price.toLocaleString()} UZS</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{product.supplier}</td>

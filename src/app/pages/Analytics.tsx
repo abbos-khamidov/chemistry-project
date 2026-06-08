@@ -188,21 +188,24 @@ export default function Analytics() {
                 className="px-3 py-2 border border-slate-300 rounded-lg text-slate-800"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  exportAnalyticsToXlsx({ t, startDate, endDate, stats, monthlyInventoryData, debtAnalytics, topProducts, totalWarehouseValue });
-                  toast.success(t('analytics.exportToastTitle'), { description: t('analytics.exportToastDesc') });
-                } catch {
-                  toast.error(t('analytics.exportError'));
-                }
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50"
-            >
-              <FileDown className="w-4 h-4" />
-              {t('analytics.export')}
-            </button>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-sm text-slate-500">{t('analytics.exportSelectDate')}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    exportAnalyticsToXlsx({ t, startDate, endDate, stats });
+                    toast.success(t('analytics.exportToastTitle'), { description: t('analytics.exportToastDesc') });
+                  } catch {
+                    toast.error(t('analytics.exportError'));
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50"
+              >
+                <FileDown className="w-4 h-4" />
+                {t('analytics.export')}
+              </button>
+            </div>
           </div>
         </div>
       </div>

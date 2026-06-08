@@ -142,14 +142,18 @@ async function fetchAccountsFromDb(): Promise<StoredAccount[]> {
   return result;
 }
 
-async function upsertAccountsToDb(accounts: StoredAccount[]): Promise<void> {
-  if (!isSupabaseConfigured) return;
+async function upsertAccountsToDb(accounts: StoredAccount[]): Promise<boolean> {
+  if (!isSupabaseConfigured) return true;
   const payload = accounts.map(storedToRow);
   const { error } = await supabase.from('accounts').upsert(payload, { onConflict: 'id' });
   if (error) {
     console.error('[AuthContext] Failed to upsert accounts to Supabase:', error);
+    return false;
   }
+  return true;
 }
+
+const PERSIST_ERROR = 'Не удалось сохранить изменения на сервере. Проверьте соединение и попробуйте снова.';
 
 async function deleteAccountFromDb(accountId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
@@ -317,7 +321,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const next = [...list];
     next[idx] = { ...next[idx], status };
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     return { ok: true, role: list[idx].role };
   }, []);
@@ -374,7 +380,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissions: { addProducts: true, editProducts: true, issueDebt: true, viewDebts: true },
     };
     const next = [...list, acc];
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     return { ok: true, role: 'worker' };
   }, []);
@@ -434,7 +442,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: input.password,
     };
     const next = [...list, acc];
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     return { ok: true, role };
   }, []);
@@ -462,7 +472,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         editDebtRecords: Boolean(permissions.editDebtRecords),
       },
     };
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     if (user?.id === staffId) {
       setUser(stripPassword(next[idx]));
@@ -498,7 +510,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const next = [...list];
     next[idx] = nextAcc;
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     setUser(stripPassword(nextAcc));
     return { ok: true, role: nextAcc.role };
@@ -564,7 +578,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const next = [...list];
     next[idx] = nextAcc;
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     setUser(stripPassword(nextAcc));
     return { ok: true, role: 'director' };
@@ -608,7 +624,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const next = [...list];
     next[idx] = nextAcc;
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     if (user?.id === workerId) {
       setUser(stripPassword(nextAcc));
@@ -690,7 +708,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const next = [...list];
     next[idx] = nextAcc;
-    await upsertAccountsToDb(next);
+    if (!(await upsertAccountsToDb(next))) {
+      return { ok: false, error: PERSIST_ERROR };
+    }
     setAccounts(next);
     if (user?.id === staffId) {
       setUser(stripPassword(nextAcc));

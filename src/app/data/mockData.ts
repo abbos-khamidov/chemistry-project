@@ -119,6 +119,14 @@ export interface User {
   lastActivity: string;
 }
 
+export interface DeletedDebt {
+  id: string;
+  snapshot: Debt;
+  deletedAt: string;
+  deletedBy: string;
+  deletedByRole: string;
+}
+
 /** Стартовые данные пустые — заполняйте через интерфейс и localStorage. */
 export const mockProducts: Product[] = [];
 

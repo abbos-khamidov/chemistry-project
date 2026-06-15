@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, ClientSale } from '../data/mockData';
+import type { Product, Debt, DebtHistoryEntry, AuditLogEntry, ClientSale, DeletedDebt } from '../data/mockData';
 import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
 import { deriveProductStatus } from '../lib/warehouseUtils';
 import { getSessionUserIdFromCookie } from '../lib/sessionCookie';
@@ -21,6 +21,7 @@ function logSupabaseError(scope: string, error: unknown) {
 export type WarehousePersisted = {
   products: Product[];
   debts: Debt[];
+  deletedDebts: DeletedDebt[];
   clientSales: ClientSale[];
   auditLog: AuditLogEntry[];
   readAuditIds: string[];
@@ -29,6 +30,7 @@ export type WarehousePersisted = {
 const empty = (): WarehousePersisted => ({
   products: [],
   debts: [],
+  deletedDebts: [],
   clientSales: [],
   auditLog: [],
   readAuditIds: [],
@@ -181,6 +183,14 @@ type AuditLogRow = {
   ip: string;
 };
 
+type DeletedDebtRow = {
+  id: string;
+  snapshot: Debt;
+  deleted_at: string;
+  deleted_by: string;
+  deleted_by_role: string;
+};
+
 async function loadFromDb(fallback: WarehousePersisted): Promise<WarehousePersisted> {
   if (!isSupabaseConfigured) return fallback;
 
@@ -193,12 +203,14 @@ async function loadFromDb(fallback: WarehousePersisted): Promise<WarehousePersis
     salesRes,
     auditRes,
     readsRes,
+    deletedDebtsRes,
   ] = await Promise.all([
     supabase.from('products').select('*').order('created_at', { ascending: true }),
     supabase.from('debts').select('*').order('created_at', { ascending: false }),
     supabase.from('client_sales').select('*').order('created_at', { ascending: false }),
     supabase.from('audit_log').select('*').order('at', { ascending: false }),
     userId ? supabase.from('audit_reads').select('audit_id').eq('user_id', userId) : Promise.resolve({ data: [], error: null }),
+    supabase.from('deleted_debts').select('*').order('created_at', { ascending: false }),
   ]);
 
   logSupabaseError('products select failed', productsRes.error);
@@ -206,6 +218,7 @@ async function loadFromDb(fallback: WarehousePersisted): Promise<WarehousePersis
   logSupabaseError('client_sales select failed', salesRes.error);
   logSupabaseError('audit_log select failed', auditRes.error);
   logSupabaseError('audit_reads select failed', (readsRes as { error?: unknown }).error);
+  logSupabaseError('deleted_debts select failed', deletedDebtsRes.error);
 
   const products = productsRes.error
     ? fb.products
@@ -284,7 +297,17 @@ async function loadFromDb(fallback: WarehousePersisted): Promise<WarehousePersis
     ? fb.readAuditIds
     : (((readsRes as any).data as Array<{ audit_id: string }> | null) ?? []).map((r) => r.audit_id);
 
-  return { products, debts, clientSales, auditLog, readAuditIds };
+  const deletedDebts = deletedDebtsRes.error
+    ? fb.deletedDebts
+    : ((deletedDebtsRes.data as DeletedDebtRow[] | null) ?? []).map((r) => ({
+        id: r.id,
+        snapshot: r.snapshot,
+        deletedAt: r.deleted_at,
+        deletedBy: r.deleted_by,
+        deletedByRole: r.deleted_by_role,
+      }));
+
+  return { products, debts, deletedDebts, clientSales, auditLog, readAuditIds };
 }
 
 function toProductRows(products: Product[]): ProductRow[] {
@@ -346,6 +369,16 @@ function toClientSaleRows(rows: ClientSale[]): ClientSaleRow[] {
   }));
 }
 
+function toDeletedDebtRows(rows: DeletedDebt[]): DeletedDebtRow[] {
+  return rows.map((r) => ({
+    id: r.id,
+    snapshot: r.snapshot,
+    deleted_at: r.deletedAt,
+    deleted_by: r.deletedBy,
+    deleted_by_role: r.deletedByRole,
+  }));
+}
+
 function toAuditRows(rows: AuditLogEntry[]): AuditLogRow[] {
   return rows.map((r) => ({
     id: r.id,
@@ -374,6 +407,7 @@ async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
   await deleteMissing('debts', prev.debts.map((x) => x.id), next.debts.map((x) => x.id));
   await deleteMissing('client_sales', prev.clientSales.map((x) => x.id), next.clientSales.map((x) => x.id));
   await deleteMissing('audit_log', prev.auditLog.map((x) => x.id), next.auditLog.map((x) => x.id));
+  await deleteMissing('deleted_debts', prev.deletedDebts.map((x) => x.id), next.deletedDebts.map((x) => x.id));
 
   if (next.products.length > 0) {
     const { error } = await supabase.from('products').upsert(toProductRows(next.products), { onConflict: 'id' });
@@ -390,6 +424,10 @@ async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
   if (next.auditLog.length > 0) {
     const { error } = await supabase.from('audit_log').upsert(toAuditRows(next.auditLog), { onConflict: 'id' });
     logSupabaseError('audit_log upsert failed', error);
+  }
+  if (next.deletedDebts.length > 0) {
+    const { error } = await supabase.from('deleted_debts').upsert(toDeletedDebtRows(next.deletedDebts), { onConflict: 'id' });
+    logSupabaseError('deleted_debts upsert failed', error);
   }
 
   const userId = getSessionUserIdFromCookie();
@@ -477,6 +515,7 @@ type WarehouseContextValue = WarehousePersisted & {
     entryId: string,
     input: UpdateDebtHistoryInput
   ) => { ok: true } | { ok: false; error: string };
+  deleteDebtor: (debtId: string, deletedBy: string, deletedByRole: string) => { ok: true } | { ok: false; error: string };
   recordClientSale: (input: RecordClientSaleInput) => { ok: true } | { ok: false; error: string };
   appendAudit: (entry: Omit<AuditLogEntry, 'id' | 'at'>) => void;
   markAuditRead: (auditId: string) => void;
@@ -893,6 +932,28 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     [commit]
   );
 
+  const deleteDebtor = useCallback(
+    (debtId: string, deletedBy: string, deletedByRole: string): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      const d = prev.debts.find((x) => x.id === debtId);
+      if (!d) return { ok: false, error: 'Долг не найден' };
+      const backup: DeletedDebt = {
+        id: debtId,
+        snapshot: d,
+        deletedAt: nowStamp(),
+        deletedBy,
+        deletedByRole,
+      };
+      commit({
+        ...prev,
+        debts: prev.debts.filter((x) => x.id !== debtId),
+        deletedDebts: [backup, ...prev.deletedDebts],
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
   const recordClientSale = useCallback(
     (input: RecordClientSaleInput): { ok: true } | { ok: false; error: string } => {
       const qty = Number(input.quantity);
@@ -981,6 +1042,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       updateDebtorProfile,
       updateDebtSchedule,
       updateDebtHistoryEntry,
+      deleteDebtor,
       recordClientSale,
       appendAudit,
       markAuditRead,
@@ -997,6 +1059,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       updateDebtorProfile,
       updateDebtSchedule,
       updateDebtHistoryEntry,
+      deleteDebtor,
       recordClientSale,
       appendAudit,
       markAuditRead,

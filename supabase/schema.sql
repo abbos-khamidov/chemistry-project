@@ -99,6 +99,15 @@ create table if not exists public.audit_log (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.deleted_debts (
+  id uuid primary key,
+  snapshot jsonb not null,
+  deleted_at text not null,
+  deleted_by text not null,
+  deleted_by_role text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.audit_reads (
   user_id text not null,
   audit_id text not null,
@@ -139,6 +148,7 @@ alter table public.client_sales enable row level security;
 alter table public.worker_kpis enable row level security;
 alter table public.audit_log enable row level security;
 alter table public.audit_reads enable row level security;
+alter table public.deleted_debts enable row level security;
 
 drop policy if exists p_accounts_all on public.accounts;
 create policy p_accounts_all on public.accounts for all to anon, authenticated using (true) with check (true);
@@ -160,6 +170,9 @@ create policy p_audit_all on public.audit_log for all to anon, authenticated usi
 
 drop policy if exists p_audit_reads_all on public.audit_reads;
 create policy p_audit_reads_all on public.audit_reads for all to anon, authenticated using (true) with check (true);
+
+drop policy if exists p_deleted_debts_all on public.deleted_debts;
+create policy p_deleted_debts_all on public.deleted_debts for all to anon, authenticated using (true) with check (true);
 
 -- Seed director: canonical defaults login diyor / password 1234 (do not change in repo; director may change in-app).
 insert into public.accounts (full_name, phone, username, password, role, status, last_activity, permissions)

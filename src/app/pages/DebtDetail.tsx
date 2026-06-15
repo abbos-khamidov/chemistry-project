@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { PhoneField } from '../components/PhoneField';
 import { AmountField } from '../components/AmountField';
 import { formatPhoneDisplay, isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/phone';
-import { useParams, Link } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   CheckCircle,
   Building2,
   X,
+  Trash2,
 } from 'lucide-react';
 import { useWarehouse } from '../context/WarehouseContext';
 import { useAuth } from '../context/AuthContext';
@@ -29,7 +30,8 @@ const LINE_PREFIX = 'line:';
 
 export default function DebtDetail() {
   const { id } = useParams();
-  const { debts, products, applyDebtPayment, appendAudit, updateDebtorProfile, updateDebtHistoryEntry, updateDebtSchedule } =
+  const navigate = useNavigate();
+  const { debts, products, applyDebtPayment, appendAudit, updateDebtorProfile, updateDebtHistoryEntry, updateDebtSchedule, deleteDebtor } =
     useWarehouse();
   const { user } = useAuth();
   const { t, locale } = useI18n();
@@ -61,6 +63,8 @@ export default function DebtDetail() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [schedIssue, setSchedIssue] = useState('');
   const [schedDue, setSchedDue] = useState('');
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (!debt) {
     return (
@@ -268,6 +272,25 @@ export default function DebtDetail() {
     setProductKey(GENERAL_PRODUCT);
   };
 
+  const confirmDelete = () => {
+    if (!id || !canEditDebt) return;
+    const result = deleteDebtor(id, user?.fullName ?? '—', user?.role ?? 'director');
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    appendAudit({
+      userName: user?.fullName ?? '—',
+      userRole: (user?.role as 'director' | 'assistant' | 'worker') ?? 'director',
+      action: 'Удаление',
+      entity: 'Долг',
+      details: `Должник удалён (бэкап сохранён): ${debt.fullName}`,
+      ip: '—',
+    });
+    toast.success(`Должник «${debt.fullName}» удалён. Бэкап сохранён.`);
+    navigate('/debts');
+  };
+
   const history = debt.debtHistory ?? [];
   const legacyPayments = debt.paymentHistory ?? [];
 
@@ -337,9 +360,58 @@ export default function DebtDetail() {
                 <span>Сроки оплаты</span>
               </button>
             )}
+            {canEditDebt && (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-lg hover:bg-red-50 transition-colors text-red-600"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Удалить должника</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {deleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Удалить должника</h2>
+              <button type="button" onClick={() => setDeleteOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mb-5">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200 mb-3">
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-800">
+                  Должник <span className="font-semibold">{debt.fullName}</span> будет удалён из списка.
+                  Бэкап автоматически сохраняется.
+                </p>
+              </div>
+              <p className="text-sm text-slate-600">Это действие нельзя отменить через интерфейс. Продолжить?</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {payOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">

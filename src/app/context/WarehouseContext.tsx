@@ -170,6 +170,7 @@ type ClientSaleRow = {
   created_at?: string | null;
   created_by_user_id: string | null;
   created_by_role: ClientSale['createdByRole'] | null;
+  archived_at?: string | null;
 };
 
 type AuditLogRow = {
@@ -278,6 +279,7 @@ async function loadFromDb(fallback: WarehousePersisted): Promise<WarehousePersis
         createdAt: r.created_at ? new Date(r.created_at as string).toISOString() : undefined,
         createdByUserId: r.created_by_user_id ?? undefined,
         createdByRole: r.created_by_role ?? undefined,
+        archivedAt: r.archived_at ?? undefined,
       }));
 
   const auditLog = auditRes.error
@@ -366,6 +368,7 @@ function toClientSaleRows(rows: ClientSale[]): ClientSaleRow[] {
     created_at: r.createdAt ?? `${r.date}T12:00:00.000Z`,
     created_by_user_id: r.createdByUserId ?? null,
     created_by_role: r.createdByRole ?? null,
+    archived_at: r.archivedAt ?? null,
   }));
 }
 
@@ -517,6 +520,9 @@ type WarehouseContextValue = WarehousePersisted & {
   ) => { ok: true } | { ok: false; error: string };
   deleteDebtor: (debtId: string, deletedBy: string, deletedByRole: string) => { ok: true } | { ok: false; error: string };
   recordClientSale: (input: RecordClientSaleInput) => { ok: true } | { ok: false; error: string };
+  archiveClientSale: (saleId: string) => { ok: true } | { ok: false; error: string };
+  restoreClientSale: (saleId: string) => { ok: true } | { ok: false; error: string };
+  deleteClientSale: (saleId: string) => { ok: true } | { ok: false; error: string };
   appendAudit: (entry: Omit<AuditLogEntry, 'id' | 'at'>) => void;
   markAuditRead: (auditId: string) => void;
   markAllAuditRead: () => void;
@@ -1014,6 +1020,51 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     [commit]
   );
 
+  const archiveClientSale = useCallback(
+    (saleId: string): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      const sale = prev.clientSales.find((x) => x.id === saleId);
+      if (!sale) return { ok: false, error: 'Клиент не найден' };
+      if (sale.archivedAt) return { ok: true };
+      commit({
+        ...prev,
+        clientSales: prev.clientSales.map((x) => (x.id === saleId ? { ...x, archivedAt: nowStamp() } : x)),
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
+  const restoreClientSale = useCallback(
+    (saleId: string): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      if (!prev.clientSales.some((x) => x.id === saleId)) return { ok: false, error: 'Клиент не найден' };
+      commit({
+        ...prev,
+        clientSales: prev.clientSales.map((x) => {
+          if (x.id !== saleId) return x;
+          const { archivedAt, ...rest } = x;
+          return rest;
+        }),
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
+  const deleteClientSale = useCallback(
+    (saleId: string): { ok: true } | { ok: false; error: string } => {
+      const prev = dataRef.current;
+      if (!prev.clientSales.some((x) => x.id === saleId)) return { ok: false, error: 'Клиент не найден' };
+      commit({
+        ...prev,
+        clientSales: prev.clientSales.filter((x) => x.id !== saleId),
+      });
+      return { ok: true };
+    },
+    [commit]
+  );
+
   const markAuditRead = useCallback(
     (auditId: string) => {
       const prev = dataRef.current;
@@ -1044,6 +1095,9 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       updateDebtHistoryEntry,
       deleteDebtor,
       recordClientSale,
+      archiveClientSale,
+      restoreClientSale,
+      deleteClientSale,
       appendAudit,
       markAuditRead,
       markAllAuditRead,
@@ -1061,6 +1115,9 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       updateDebtHistoryEntry,
       deleteDebtor,
       recordClientSale,
+      archiveClientSale,
+      restoreClientSale,
+      deleteClientSale,
       appendAudit,
       markAuditRead,
       markAllAuditRead,

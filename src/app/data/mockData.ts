@@ -62,6 +62,7 @@ export interface ClientSale {
   createdAt?: string;
   createdByUserId?: string;
   createdByRole?: 'director' | 'assistant' | 'worker';
+  archivedAt?: string;
 }
 
 export interface Debt {
@@ -165,4 +166,3 @@ export interface AuditLogEntry {
 }
 
 export const mockAuditLog: AuditLogEntry[] = [];
-

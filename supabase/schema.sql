@@ -69,8 +69,12 @@ create table if not exists public.client_sales (
   date text not null,
   created_by_user_id text,
   created_by_role text,
+  archived_at text,
   created_at timestamptz not null default now()
 );
+
+alter table public.client_sales
+  add column if not exists archived_at text;
 
 create table if not exists public.worker_kpis (
   user_id text not null,

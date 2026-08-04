@@ -77,6 +77,7 @@ export default function Analytics() {
     }
     let collectedSalesInRange = 0;
     for (const sale of clientSales ?? []) {
+      if (sale.archivedAt) continue;
       if (dateInRange(sale.date, startDate, endDate)) collectedSalesInRange += sale.amountUzs;
     }
     const collectedInRange = collectedDebtInRange + collectedSalesInRange;

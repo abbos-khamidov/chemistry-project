@@ -13,6 +13,7 @@ import { isCompleteInternationalPhone12, normalizePhoneForStore } from '../lib/p
 import { deriveProductStatus } from '../lib/warehouseUtils';
 import { getSessionUserIdFromCookie } from '../lib/sessionCookie';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 
 function logSupabaseError(scope: string, error: unknown) {
   if (error) console.error(`[WarehouseContext] ${scope}:`, error);
@@ -395,51 +396,138 @@ function toAuditRows(rows: AuditLogEntry[]): AuditLogRow[] {
   }));
 }
 
-async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted) {
+/** Движение остатка: применяется на сервере атомарно (quantity = quantity + delta). */
+export type StockMove = {
+  productId: string;
+  delta: number;
+  entry: Product['history'][number];
+};
+
+class InsufficientStockError extends Error {}
+
+let rpcMissingWarned = false;
+
+type Row = { id: string } & Record<string, unknown>;
+
+/**
+ * Пишет в таблицу только реально изменённое:
+ *  - новые строки → upsert целиком;
+ *  - изменённые → update только отличающихся колонок;
+ *  - пропавшие → delete.
+ * Раньше сюда улетал весь массив из памяти браузера, и любая «застывшая»
+ * вкладка перезаписывала свежие остатки/долги своими старыми значениями.
+ */
+async function syncTable<T extends { id: string }>(
+  table: string,
+  prevItems: T[],
+  nextItems: T[],
+  toRows: (items: T[]) => Row[],
+  skipIds?: Set<string>
+) {
+  const prevById = new Map(prevItems.map((x) => [x.id, x]));
+  const nextIds = new Set(nextItems.map((x) => x.id));
+
+  const removed = prevItems.filter((x) => !nextIds.has(x.id)).map((x) => x.id);
+  if (removed.length > 0) {
+    const { error } = await supabase.from(table).delete().in('id', removed);
+    logSupabaseError(`${table} delete failed`, error);
+  }
+
+  const inserted: T[] = [];
+  for (const item of nextItems) {
+    if (skipIds?.has(item.id)) continue;
+    const before = prevById.get(item.id);
+    if (!before) {
+      inserted.push(item);
+      continue;
+    }
+    if (before === item) continue;
+    const [prevRow] = toRows([before]);
+    const [nextRow] = toRows([item]);
+    const patch: Record<string, unknown> = {};
+    for (const key of Object.keys(nextRow)) {
+      if (key === 'id') continue;
+      if (JSON.stringify(prevRow[key]) !== JSON.stringify(nextRow[key])) patch[key] = nextRow[key];
+    }
+    if (Object.keys(patch).length === 0) continue;
+    const { error } = await supabase.from(table).update(patch).eq('id', item.id);
+    logSupabaseError(`${table} update failed`, error);
+  }
+
+  if (inserted.length > 0) {
+    const { error } = await supabase.from(table).upsert(toRows(inserted), { onConflict: 'id' });
+    logSupabaseError(`${table} insert failed`, error);
+  }
+}
+
+async function applyStockMoves(moves: StockMove[], next: WarehousePersisted) {
+  if (moves.length === 0) return;
+  const { error } = await supabase.rpc('adjust_product_stock', {
+    p_moves: moves.map((m) => ({ id: m.productId, delta: m.delta, entry: m.entry })),
+  });
+  if (!error) return;
+
+  const code = (error as { code?: string }).code;
+  if (code === 'PGRST202' || code === '42883') {
+    // Миграция supabase/migrations/20261124_atomic_stock.sql ещё не применена —
+    // пишем только затронутые товары (старое поведение, но без остальных строк).
+    if (!rpcMissingWarned) {
+      rpcMissingWarned = true;
+      console.warn('[WarehouseContext] adjust_product_stock RPC not found, falling back to row update');
+    }
+    for (const m of moves) {
+      const p = next.products.find((x) => x.id === m.productId);
+      if (!p) continue;
+      const { error: e } = await supabase
+        .from('products')
+        .update({ quantity: p.quantity, status: p.status, history: p.history })
+        .eq('id', p.id);
+      logSupabaseError('products stock fallback update failed', e);
+    }
+    return;
+  }
+  if (code === 'P0001' && String(error.message).startsWith('insufficient_stock')) {
+    throw new InsufficientStockError(error.message);
+  }
+  logSupabaseError('adjust_product_stock failed', error);
+  throw error;
+}
+
+async function syncRemote(prev: WarehousePersisted, next: WarehousePersisted, moves: StockMove[]) {
   if (!isSupabaseConfigured) return;
 
-  const deleteMissing = async (table: string, prevIds: string[], nextIds: string[]) => {
-    const removed = prevIds.filter((id) => !nextIds.includes(id));
-    if (removed.length > 0) {
-      const { error } = await supabase.from(table).delete().in('id', removed);
-      logSupabaseError(`${table} delete missing failed`, error);
-    }
-  };
+  // Сначала остатки: если на складе уже не хватает (продали с другого устройства),
+  // продажу/долг в базу не пишем.
+  await applyStockMoves(moves, next);
+  const movedIds = new Set(moves.map((m) => m.productId));
 
-  await deleteMissing('products', prev.products.map((x) => x.id), next.products.map((x) => x.id));
-  await deleteMissing('debts', prev.debts.map((x) => x.id), next.debts.map((x) => x.id));
-  await deleteMissing('client_sales', prev.clientSales.map((x) => x.id), next.clientSales.map((x) => x.id));
-  await deleteMissing('audit_log', prev.auditLog.map((x) => x.id), next.auditLog.map((x) => x.id));
-  await deleteMissing('deleted_debts', prev.deletedDebts.map((x) => x.id), next.deletedDebts.map((x) => x.id));
-
-  if (next.products.length > 0) {
-    const { error } = await supabase.from('products').upsert(toProductRows(next.products), { onConflict: 'id' });
-    logSupabaseError('products upsert failed', error);
+  if (prev.products !== next.products) {
+    await syncTable('products', prev.products, next.products, toProductRows, movedIds);
   }
-  if (next.debts.length > 0) {
-    const { error } = await supabase.from('debts').upsert(toDebtRows(next.debts), { onConflict: 'id' });
-    logSupabaseError('debts upsert failed', error);
+  if (prev.debts !== next.debts) {
+    await syncTable('debts', prev.debts, next.debts, toDebtRows);
   }
-  if (next.clientSales.length > 0) {
-    const { error } = await supabase.from('client_sales').upsert(toClientSaleRows(next.clientSales), { onConflict: 'id' });
-    logSupabaseError('client_sales upsert failed', error);
+  if (prev.clientSales !== next.clientSales) {
+    await syncTable('client_sales', prev.clientSales, next.clientSales, toClientSaleRows);
   }
-  if (next.auditLog.length > 0) {
-    const { error } = await supabase.from('audit_log').upsert(toAuditRows(next.auditLog), { onConflict: 'id' });
-    logSupabaseError('audit_log upsert failed', error);
+  if (prev.auditLog !== next.auditLog) {
+    await syncTable('audit_log', prev.auditLog, next.auditLog, toAuditRows);
   }
-  if (next.deletedDebts.length > 0) {
-    const { error } = await supabase.from('deleted_debts').upsert(toDeletedDebtRows(next.deletedDebts), { onConflict: 'id' });
-    logSupabaseError('deleted_debts upsert failed', error);
+  if (prev.deletedDebts !== next.deletedDebts) {
+    await syncTable('deleted_debts', prev.deletedDebts, next.deletedDebts, toDeletedDebtRows);
   }
 
   const userId = getSessionUserIdFromCookie();
-  if (userId) {
-    const { error: deleteReadsError } = await supabase.from('audit_reads').delete().eq('user_id', userId);
-    logSupabaseError('audit_reads delete failed', deleteReadsError);
-    if (next.readAuditIds.length > 0) {
-      const { error: insertReadsError } = await supabase.from('audit_reads').insert(next.readAuditIds.map((auditId) => ({ user_id: userId, audit_id: auditId })));
-      logSupabaseError('audit_reads insert failed', insertReadsError);
+  if (userId && prev.readAuditIds !== next.readAuditIds) {
+    const prevSet = new Set(prev.readAuditIds);
+    const added = next.readAuditIds.filter((id) => !prevSet.has(id));
+    if (added.length > 0) {
+      const { error } = await supabase
+        .from('audit_reads')
+        .upsert(added.map((auditId) => ({ user_id: userId, audit_id: auditId })), {
+          onConflict: 'user_id,audit_id',
+        });
+      logSupabaseError('audit_reads upsert failed', error);
     }
   }
 }
@@ -537,22 +625,45 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     dataRef.current = data;
   }, [data]);
 
+  // Все записи идут строго по очереди, а pull ждёт окончания очереди —
+  // иначе старый ответ БД мог затереть только что сделанное локальное изменение.
+  const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const commitVersionRef = useRef(0);
+  const requestPullRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     let active = true;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let reloadSeq = 0;
 
-    const pull = (fb: WarehousePersisted) => {
+    const pull = () => {
       const seq = ++reloadSeq;
-      void loadFromDb(fb).then((loaded) => {
-        if (!active) return;
-        if (seq !== reloadSeq) return;
-        dataRef.current = loaded;
-        setData(loaded);
+      void syncQueueRef.current.then(() => {
+        const versionAtStart = commitVersionRef.current;
+        return loadFromDb(dataRef.current).then((loaded) => {
+          if (!active) return;
+          if (seq !== reloadSeq) return;
+          if (versionAtStart !== commitVersionRef.current) {
+            // Пока читали — был локальный commit. Перечитаем после его записи.
+            schedulePull();
+            return;
+          }
+          dataRef.current = loaded;
+          setData(loaded);
+        });
       });
     };
 
-    pull(empty());
+    const schedulePull = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        pull();
+      }, 320);
+    };
+    requestPullRef.current = schedulePull;
+
+    pull();
 
     if (!isSupabaseConfigured) {
       return () => {
@@ -560,13 +671,12 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    const schedulePull = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        debounceTimer = null;
-        pull(dataRef.current);
-      }, 320);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') schedulePull();
     };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', schedulePull);
+    window.addEventListener('focus', schedulePull);
 
     const channel = supabase
       .channel('warehouse-sync')
@@ -574,20 +684,40 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, schedulePull)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'client_sales' }, schedulePull)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, schedulePull)
-      .subscribe();
+      .subscribe((status) => {
+        // После переподключения realtime (сон ноутбука, фон на телефоне) события
+        // за время разрыва потеряны — перечитываем всё.
+        if (status === 'SUBSCRIBED') schedulePull();
+      });
 
     return () => {
       active = false;
       if (debounceTimer) clearTimeout(debounceTimer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', schedulePull);
+      window.removeEventListener('focus', schedulePull);
       supabase.removeChannel(channel);
     };
   }, []);
 
-  const commit = useCallback((next: WarehousePersisted) => {
+  const commit = useCallback((next: WarehousePersisted, moves: StockMove[] = []) => {
     const prev = dataRef.current;
     dataRef.current = next;
+    commitVersionRef.current += 1;
     setData(next);
-    void syncRemote(prev, next);
+    syncQueueRef.current = syncQueueRef.current
+      .then(() => syncRemote(prev, next, moves))
+      .catch((err) => {
+        if (err instanceof InsufficientStockError) {
+          toast.error('Недостаточно товара на складе: остаток изменился на другом устройстве. Данные обновлены.');
+        } else {
+          console.error('[WarehouseContext] sync failed:', err);
+          toast.error('Не удалось сохранить изменения. Данные обновлены с сервера.');
+        }
+        // Откатываемся к серверному состоянию.
+        commitVersionRef.current += 1;
+        requestPullRef.current();
+      });
   }, []);
 
   const appendAudit = useCallback(
@@ -656,10 +786,13 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         status: deriveProductStatus(newQty),
         history: [entry, ...p.history],
       };
-      commit({
-        ...prev,
-        products: prev.products.map((x) => (x.id === productId ? updated : x)),
-      });
+      commit(
+        {
+          ...prev,
+          products: prev.products.map((x) => (x.id === productId ? updated : x)),
+        },
+        [{ productId, delta: quantity, entry }]
+      );
       return true;
     },
     [commit]
@@ -773,7 +906,12 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         };
       });
 
-      commit({ ...prev, products: updatedProducts, debts: [debt, ...prev.debts] });
+      const moves: StockMove[] = [];
+      for (const [productId, requestedQty] of requestedByProductId) {
+        const moved = updatedProducts.find((p) => p.id === productId);
+        if (moved) moves.push({ productId, delta: -requestedQty, entry: moved.history[0] });
+      }
+      commit({ ...prev, products: updatedProducts, debts: [debt, ...prev.debts] }, moves);
       return { ok: true, debt };
     },
     [commit]
@@ -1010,11 +1148,14 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
           ...p.history,
         ],
       };
-      commit({
-        ...prev,
-        products: prev.products.map((x) => (x.id === input.productId ? updated : x)),
-        clientSales: [sale, ...(prev.clientSales ?? [])],
-      });
+      commit(
+        {
+          ...prev,
+          products: prev.products.map((x) => (x.id === input.productId ? updated : x)),
+          clientSales: [sale, ...(prev.clientSales ?? [])],
+        },
+        [{ productId: p.id, delta: -qty, entry: updated.history[0] }]
+      );
       return { ok: true };
     },
     [commit]
